@@ -1,11 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import './App.css'
 import CircularRadar from './components/CircularRadar'
-import SimulationControls from './components/SimulationControls'
+import DroneGrid from './components/DroneGrid'
+import DetectionControls from './components/SimulationControls'
 import { useWebSocket } from './hooks/useWebSocket'
-import { SimulationResult, SimulationParams, WebSocketMessage, TargetPosition } from './types'
-
-const API_URL = 'http://127.0.0.1:3001/api/simulate'
+import { SimulationResult, WebSocketMessage, TargetPosition } from './types'
 
 function App() {
   const [data, setData] = useState<SimulationResult | null>(null)
@@ -14,14 +13,6 @@ function App() {
   const [status, setStatus] = useState<string | null>(null)
   const [targets, setTargets] = useState<TargetPosition[]>([])
   const [tracking, setTracking] = useState(false)
-  const [params, setParams] = useState<SimulationParams>({
-    fc: 10e9,
-    fs: 1e6,
-    prf: 500,
-    num_pulses: 32,
-    pulse_width: 50e-6,
-    noise_sigma: 0.1,
-  })
 
   const { socket, connected, error: wsError, send } = useWebSocket()
 
@@ -64,69 +55,7 @@ function App() {
     }
   }, [socket])
 
-  // Fallback to HTTP if WebSocket is not available
-  const fetchSimulation = useCallback(async (customParams: SimulationParams | null = null) => {
-    setLoading(true)
-    setError(null)
-    setStatus(null)
-    try {
-      const queryParams = new URLSearchParams()
-      const paramsToUse = customParams || params
-      
-      Object.entries(paramsToUse).forEach(([key, value]) => {
-        queryParams.append(key, value.toString())
-      })
-
-      const response = await fetch(`${API_URL}?${queryParams}`)
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-      const result = await response.json() as SimulationResult
-      setData(result)
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error'
-      setError(errorMessage)
-      console.error('Error fetching simulation:', err)
-    } finally {
-      setLoading(false)
-    }
-  }, [params])
-
-  const handleParamChange = (newParams: SimulationParams) => {
-    setParams(newParams)
-  }
-
-  const handleRunSimulation = useCallback(() => {
-    setError(null)
-    setStatus(null)
-    
-    // Use WebSocket if connected, otherwise fall back to HTTP
-    if (connected && send) {
-      setLoading(true)
-      const message: WebSocketMessage = {
-        type: 'simulate',
-        params: {
-          fc: params.fc,
-          fs: params.fs,
-          prf: params.prf,
-          num_pulses: params.num_pulses,
-          pulse_width: params.pulse_width,
-          noise_sigma: params.noise_sigma,
-        }
-      }
-      const success = send(message)
-      
-      if (!success) {
-        // Fallback to HTTP if WebSocket send failed
-        fetchSimulation()
-      }
-    } else {
-      // Use HTTP fallback
-      fetchSimulation()
-    }
-  }, [connected, send, params, fetchSimulation])
-
-  const handleStartTracking = useCallback(() => {
+  const handleStartDetection = useCallback(() => {
     if (!connected || !send) {
       setError('WebSocket not connected')
       return
@@ -134,33 +63,28 @@ function App() {
 
     setTracking(true)
     setTargets([])
+    setError(null)
+    // Start tracking with default parameters (backend will use fixed values)
     const message: WebSocketMessage = {
       type: 'start_tracking',
-      params: {
-        fc: params.fc,
-        fs: params.fs,
-        prf: params.prf,
-        num_pulses: params.num_pulses,
-        pulse_width: params.pulse_width,
-        noise_sigma: params.noise_sigma,
-      }
+      params: {}
     }
     send(message)
-  }, [connected, send, params])
+  }, [connected, send])
 
-  // Initial load - use HTTP for first load
+  // Auto-start detection when WebSocket connects
   useEffect(() => {
-    if (!data) {
-      fetchSimulation()
+    if (connected && !tracking) {
+      handleStartDetection()
     }
-  }, [fetchSimulation, data])
+  }, [connected, tracking, handleStartDetection])
 
   const displayError = error || wsError
 
   return (
     <div className="app">
       <header>
-        <h1>Radar Simulation Dashboard</h1>
+        <h1>Drone Detection Radar System</h1>
         <div className="connection-status">
           <span className={`status-indicator ${connected ? 'connected' : 'disconnected'}`}>
             {connected ? '●' : '○'}
@@ -170,25 +94,11 @@ function App() {
       </header>
       
       <main>
-        <SimulationControls
-          params={params}
-          onParamChange={handleParamChange}
-          onRunSimulation={handleRunSimulation}
-          loading={loading}
+        <DetectionControls
+          onStartDetection={handleStartDetection}
+          tracking={tracking}
+          connected={connected}
         />
-
-        <div className="tracking-controls">
-          <button 
-            onClick={handleStartTracking} 
-            disabled={!connected || tracking}
-            className="track-button"
-          >
-            {tracking ? 'Tracking Active...' : 'Start Target Tracking'}
-          </button>
-          {tracking && (
-            <p className="tracking-status">Tracking {targets.length} target(s)</p>
-          )}
-        </div>
 
         {displayError && (
           <div className="error">
@@ -208,10 +118,53 @@ function App() {
           </div>
         )}
 
+        {targets.length > 0 && (
+          <div className="drone-info-panel">
+            <h2>Detected Drones ({targets.length})</h2>
+            <div className="drone-list">
+              {targets.map((target) => (
+                <div key={target.id} className="drone-item">
+                  <div className="drone-header">
+                    <span className="drone-id">Drone #{target.id}</span>
+                    <span className="drone-status">● Active</span>
+                  </div>
+                  <div className="drone-details">
+                    <div className="drone-detail">
+                      <span className="detail-label">Range:</span>
+                      <span className="detail-value">{(target.range_m / 1000).toFixed(2)} km</span>
+                    </div>
+                    <div className="drone-detail">
+                      <span className="detail-label">Azimuth:</span>
+                      <span className="detail-value">{target.azimuth_deg.toFixed(1)}°</span>
+                    </div>
+                    <div className="drone-detail">
+                      <span className="detail-label">Velocity:</span>
+                      <span className="detail-value">{target.vel_m_s.toFixed(1)} m/s</span>
+                    </div>
+                    <div className="drone-detail">
+                      <span className="detail-label">RCS:</span>
+                      <span className="detail-value">{target.rcs.toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {targets.length > 0 && (
+          <div className="visualizations">
+            <div className="chart-container">
+              <h2>2D Position Grid</h2>
+              <DroneGrid targets={targets} maxRange={50_000} />
+            </div>
+          </div>
+        )}
+
         {data && !loading && (
           <div className="visualizations">
             <div className="chart-container">
-              <h2>Circular Radar Display</h2>
+              <h2>Radar Display</h2>
               <CircularRadar data={data.range_doppler_map} config={data.config} targets={targets} />
             </div>
           </div>

@@ -13,12 +13,12 @@ export interface SimulationResult {
 }
 
 export interface SimulationParams {
-  fc: number
-  fs: number
-  prf: number
-  num_pulses: number
-  pulse_width: number
-  noise_sigma: number
+  fc?: number
+  fs?: number
+  prf?: number
+  num_pulses?: number
+  pulse_width?: number
+  noise_sigma?: number
 }
 
 export interface TargetPosition {

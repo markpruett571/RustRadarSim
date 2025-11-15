@@ -244,15 +244,16 @@ fn run_simulation(params: SimulationParams) -> Result<SimulationResult, Box<dyn 
     })
 }
 
-async fn simulate_handler(Query(params): Query<HashMap<String, String>>) -> Json<SimulationResult> {
+async fn simulate_handler(_query: Query<HashMap<String, String>>) -> Json<SimulationResult> {
+    // Use fixed radar parameters optimized for drone detection
     let sim_params = SimulationParams {
-        fc: params.get("fc").and_then(|s| s.parse().ok()),
-        fs: params.get("fs").and_then(|s| s.parse().ok()),
-        prf: params.get("prf").and_then(|s| s.parse().ok()),
-        num_pulses: params.get("num_pulses").and_then(|s| s.parse().ok()),
-        pulse_width: params.get("pulse_width").and_then(|s| s.parse().ok()),
-        noise_sigma: params.get("noise_sigma").and_then(|s| s.parse().ok()),
-        targets: None, // For now, use defaults
+        fc: None,        // Will use default 10 GHz
+        fs: None,        // Will use default 1 MHz
+        prf: None,       // Will use default 500 Hz
+        num_pulses: None, // Will use default 32
+        pulse_width: None, // Will use default 50 μs
+        noise_sigma: None, // Will use default 0.1
+        targets: None,   // Use defaults
     };
 
     match run_simulation(sim_params) {
@@ -280,7 +281,7 @@ async fn websocket_handler(ws: WebSocketUpgrade) -> Response {
 }
 
 async fn handle_socket(socket: WebSocket) {
-    let (mut sender, mut receiver) = socket.split();
+    let (sender, mut receiver) = socket.split();
     let sender_arc = Arc::new(Mutex::new(sender));
     let mut tracking_handle: Option<tokio::task::JoinHandle<()>> = None;
 
@@ -289,7 +290,7 @@ async fn handle_socket(socket: WebSocket) {
         match msg {
             Message::Text(text) => {
                 match serde_json::from_str::<WebSocketMessage>(&text) {
-                    Ok(WebSocketMessage::Simulate { params }) => {
+                    Ok(WebSocketMessage::Simulate { params: _ }) => {
                         // Send status update
                         let status = WebSocketMessage::Status {
                             message: "Running simulation...".to_string(),
@@ -299,11 +300,19 @@ async fn handle_socket(socket: WebSocket) {
                             let _ = s.send(Message::Text(json)).await;
                         }
 
-                        // Run simulation in a blocking task
-                        let params_clone = params.clone();
+                        // Run simulation with fixed parameters
                         let sender_clone = sender_arc.clone();
+                        let sim_params = SimulationParams {
+                            fc: None,
+                            fs: None,
+                            prf: None,
+                            num_pulses: None,
+                            pulse_width: None,
+                            noise_sigma: None,
+                            targets: None,
+                        };
                         let result = tokio::task::spawn_blocking(move || {
-                            run_simulation(params_clone)
+                            run_simulation(sim_params)
                         })
                         .await;
 
@@ -335,20 +344,20 @@ async fn handle_socket(socket: WebSocket) {
                             }
                         }
                     }
-                    Ok(WebSocketMessage::StartTracking { params }) => {
+                    Ok(WebSocketMessage::StartTracking { params: _ }) => {
                         // Stop existing tracking if any
                         if let Some(handle) = tracking_handle.take() {
                             handle.abort();
                         }
 
-                        // Start new tracking
+                        // Start new tracking with fixed default drone targets
                         let sender_clone = sender_arc.clone();
-                        let targets = params.targets.clone().unwrap_or_else(|| {
-                            vec![
-                                Target { range_m: 10_000.0, vel_m_s: 30.0, rcs: 1.0 },
-                                Target { range_m: 15_000.0, vel_m_s: -50.0, rcs: 0.6 },
-                            ]
-                        });
+                        // Default drone targets for demonstration
+                        let targets = vec![
+                            Target { range_m: 10_000.0, vel_m_s: 30.0, rcs: 1.0 },
+                            Target { range_m: 15_000.0, vel_m_s: -50.0, rcs: 0.6 },
+                            Target { range_m: 8_000.0, vel_m_s: 25.0, rcs: 0.8 },
+                        ];
 
                         // Convert targets to initial positions with azimuth
                         let mut target_positions: Vec<TargetPosition> = targets
