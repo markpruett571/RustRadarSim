@@ -29,6 +29,24 @@ export interface TargetPosition {
   rcs: number
 }
 
+export interface DroneAnalysis {
+  drone_id: number
+  threat_level: 'low' | 'medium' | 'high'
+  estimated_type: string
+  confidence: number
+  trajectory_analysis: {
+    heading_deg: number
+    speed_m_s: number
+    altitude_estimate_m: number
+  }
+  risk_assessment: {
+    proximity_risk: number
+    velocity_risk: number
+    overall_risk: number
+  }
+  recommendations: string[]
+}
+
 export type WebSocketMessage =
   | { type: 'simulate'; params: SimulationParams }
   | { type: 'result'; range_doppler_map: number[][]; range_profile: number[]; config: SimulationConfig }
@@ -36,4 +54,10 @@ export type WebSocketMessage =
   | { type: 'status'; message: string }
   | { type: 'targets'; targets: TargetPosition[] }
   | { type: 'start_tracking'; params: SimulationParams }
+
+export type AnalysisWebSocketMessage =
+  | { type: 'analyze'; drone_id: number; target: TargetPosition }
+  | { type: 'analysis_result'; analysis: DroneAnalysis }
+  | { type: 'analysis_error'; message: string }
+  | { type: 'analysis_status'; message: string }
 

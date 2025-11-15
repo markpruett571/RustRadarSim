@@ -82,6 +82,120 @@ enum WebSocketMessage {
     StartTracking { params: SimulationParams },
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(tag = "type")]
+enum AnalysisWebSocketMessage {
+    #[serde(rename = "analyze")]
+    Analyze { drone_id: usize, target: TargetPosition },
+    #[serde(rename = "analysis_result")]
+    AnalysisResult { analysis: DroneAnalysis },
+    #[serde(rename = "analysis_error")]
+    AnalysisError { message: String },
+    #[serde(rename = "analysis_status")]
+    AnalysisStatus { message: String },
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct DroneAnalysis {
+    drone_id: usize,
+    threat_level: String,
+    estimated_type: String,
+    confidence: f64,
+    trajectory_analysis: TrajectoryAnalysis,
+    risk_assessment: RiskAssessment,
+    recommendations: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct TrajectoryAnalysis {
+    heading_deg: f64,
+    speed_m_s: f64,
+    altitude_estimate_m: f64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct RiskAssessment {
+    proximity_risk: f64,
+    velocity_risk: f64,
+    overall_risk: f64,
+}
+
+fn analyze_drone(target: &TargetPosition) -> DroneAnalysis {
+    // Simulate analysis computation (this would be more complex in reality)
+    use std::time::Duration;
+    std::thread::sleep(Duration::from_millis(500)); // Simulate processing time
+    
+    let speed = target.vel_m_s.abs();
+    let range_km = target.range_m / 1000.0;
+    
+    // Determine threat level
+    let threat_level = if range_km < 5.0 && speed > 40.0 {
+        "high"
+    } else if range_km < 10.0 || speed > 30.0 {
+        "medium"
+    } else {
+        "low"
+    };
+    
+    // Estimate drone type based on characteristics
+    let estimated_type = if speed > 50.0 {
+        "Racing/High-Speed"
+    } else if target.rcs > 0.8 {
+        "Commercial/Large"
+    } else {
+        "Consumer/Small"
+    };
+    
+    // Calculate confidence based on RCS and consistency
+    let confidence = (target.rcs * 0.6 + 0.4).min(1.0);
+    
+    // Trajectory analysis
+    let heading_deg = target.azimuth_deg;
+    let altitude_estimate_m = if range_km < 2.0 {
+        50.0 + (range_km * 25.0)
+    } else {
+        100.0 + (range_km * 20.0)
+    };
+    
+    // Risk assessment
+    let proximity_risk = (1.0 - (range_km / 50.0).min(1.0)) * 100.0;
+    let velocity_risk = (speed / 100.0).min(1.0) * 100.0;
+    let overall_risk = (proximity_risk * 0.6 + velocity_risk * 0.4).min(100.0);
+    
+    // Generate recommendations
+    let mut recommendations = Vec::new();
+    if proximity_risk > 70.0 {
+        recommendations.push("High proximity risk - consider immediate action".to_string());
+    }
+    if velocity_risk > 60.0 {
+        recommendations.push("High velocity detected - monitor closely".to_string());
+    }
+    if range_km < 3.0 {
+        recommendations.push("Drone in close range - alert security personnel".to_string());
+    }
+    if recommendations.is_empty() {
+        recommendations.push("Continue monitoring - no immediate action required".to_string());
+    }
+    
+    DroneAnalysis {
+        drone_id: target.id,
+        threat_level: threat_level.to_string(),
+        estimated_type: estimated_type.to_string(),
+        confidence,
+        trajectory_analysis: TrajectoryAnalysis {
+            heading_deg,
+            speed_m_s: speed,
+            altitude_estimate_m,
+        },
+        risk_assessment: RiskAssessment {
+            proximity_risk,
+            velocity_risk,
+            overall_risk,
+        },
+        recommendations,
+    }
+}
+
 fn run_simulation(params: SimulationParams) -> Result<SimulationResult, Box<dyn std::error::Error + Send + Sync>> {
     // Default parameters
     let fc = params.fc.unwrap_or(10.0e9);
@@ -280,6 +394,77 @@ async fn websocket_handler(ws: WebSocketUpgrade) -> Response {
     ws.on_upgrade(handle_socket)
 }
 
+async fn analysis_websocket_handler(ws: WebSocketUpgrade) -> Response {
+    ws.on_upgrade(handle_analysis_socket)
+}
+
+async fn handle_analysis_socket(socket: WebSocket) {
+    let (sender, mut receiver) = socket.split();
+    let sender_arc = Arc::new(Mutex::new(sender));
+    
+    // Handle incoming messages
+    while let Some(Ok(msg)) = receiver.next().await {
+        match msg {
+            Message::Text(text) => {
+                match serde_json::from_str::<AnalysisWebSocketMessage>(&text) {
+                    Ok(AnalysisWebSocketMessage::Analyze { drone_id, target }) => {
+                        // Send status update
+                        let status = AnalysisWebSocketMessage::AnalysisStatus {
+                            message: format!("Analyzing drone #{}...", drone_id),
+                        };
+                        if let Ok(json) = serde_json::to_string(&status) {
+                            let mut s = sender_arc.lock().await;
+                            let _ = s.send(Message::Text(json)).await;
+                        }
+                        
+                        // Run analysis on a separate thread (blocking task)
+                        // This ensures it doesn't block the async runtime
+                        let sender_clone = sender_arc.clone();
+                        let analysis_result = tokio::task::spawn_blocking(move || {
+                            analyze_drone(&target)
+                        }).await;
+                        
+                        match analysis_result {
+                            Ok(analysis) => {
+                                let response = AnalysisWebSocketMessage::AnalysisResult { analysis };
+                                if let Ok(json) = serde_json::to_string(&response) {
+                                    let mut s = sender_clone.lock().await;
+                                    let _ = s.send(Message::Text(json)).await;
+                                }
+                            }
+                            Err(e) => {
+                                let error_msg = AnalysisWebSocketMessage::AnalysisError {
+                                    message: format!("Analysis task error: {}", e),
+                                };
+                                if let Ok(json) = serde_json::to_string(&error_msg) {
+                                    let mut s = sender_clone.lock().await;
+                                    let _ = s.send(Message::Text(json)).await;
+                                }
+                            }
+                        }
+                    }
+                    Ok(_) => {
+                        // Other message types
+                    }
+                    Err(e) => {
+                        let error_msg = AnalysisWebSocketMessage::AnalysisError {
+                            message: format!("Invalid message format: {}", e),
+                        };
+                        if let Ok(json) = serde_json::to_string(&error_msg) {
+                            let mut s = sender_arc.lock().await;
+                            let _ = s.send(Message::Text(json)).await;
+                        }
+                    }
+                }
+            }
+            Message::Close(_) => {
+                break;
+            }
+            _ => {}
+        }
+    }
+}
+
 async fn handle_socket(socket: WebSocket) {
     let (sender, mut receiver) = socket.split();
     let sender_arc = Arc::new(Mutex::new(sender));
@@ -444,12 +629,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app = Router::new()
         .route("/api/simulate", get(simulate_handler))
         .route("/ws", get(websocket_handler))
+        .route("/ws/analyze", get(analysis_websocket_handler))
         .layer(cors);
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:3001").await?;
     println!("Server running on http://127.0.0.1:3001");
     println!("API endpoint: http://127.0.0.1:3001/api/simulate");
     println!("WebSocket endpoint: ws://127.0.0.1:3001/ws");
+    println!("Analysis WebSocket endpoint: ws://127.0.0.1:3001/ws/analyze");
 
     axum::serve(listener, app).await?;
 

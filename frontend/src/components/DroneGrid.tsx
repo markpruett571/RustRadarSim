@@ -1,9 +1,11 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useCallback } from 'react'
 import { TargetPosition } from '../types'
 
 interface DroneGridProps {
   targets: TargetPosition[]
   maxRange?: number // Maximum range in meters for scaling
+  selectedDroneId?: number | null
+  onDroneSelect?: (droneId: number | null) => void
 }
 
 interface DroneHistory {
@@ -11,7 +13,7 @@ interface DroneHistory {
   positions: Array<{ x: number; y: number; time: number }>
 }
 
-function DroneGrid({ targets, maxRange = 50_000 }: DroneGridProps) {
+function DroneGrid({ targets, maxRange = 50_000, selectedDroneId, onDroneSelect }: DroneGridProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const historyRef = useRef<Map<number, DroneHistory>>(new Map())
   const size = 600 // Canvas size
@@ -23,6 +25,49 @@ function DroneGrid({ targets, maxRange = 50_000 }: DroneGridProps) {
     const y = range * Math.sin(azimuthRad)
     return { x, y }
   }
+
+  // Get screen coordinates for a target
+  const getScreenCoords = useCallback((target: TargetPosition) => {
+    const centerX = size / 2
+    const centerY = size / 2
+    const scale = (size * 0.4) / maxRange
+    const { x, y } = polarToCartesian(target.range_m, target.azimuth_deg)
+    return {
+      screenX: centerX + x * scale,
+      screenY: centerY - y * scale,
+    }
+  }, [maxRange, size])
+
+  // Handle canvas click to select drone
+  const handleCanvasClick = useCallback((event: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current
+    if (!canvas || !onDroneSelect) return
+
+    const rect = canvas.getBoundingClientRect()
+    const clickX = event.clientX - rect.left
+    const clickY = event.clientY - rect.top
+
+    const clickRadius = 20 // Clickable radius around each drone
+
+    // Check each drone to see if click is within its radius
+    for (const target of targets) {
+      const { screenX, screenY } = getScreenCoords(target)
+      const distance = Math.sqrt(
+        Math.pow(clickX - screenX, 2) + Math.pow(clickY - screenY, 2)
+      )
+
+      if (distance <= clickRadius) {
+        // Toggle selection: if already selected, deselect; otherwise select
+        onDroneSelect(selectedDroneId === target.id ? null : target.id)
+        return
+      }
+    }
+
+    // Clicked on empty space - deselect
+    if (selectedDroneId !== null) {
+      onDroneSelect(null)
+    }
+  }, [targets, selectedDroneId, onDroneSelect, getScreenCoords, maxRange, size])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -157,9 +202,29 @@ function DroneGrid({ targets, maxRange = 50_000 }: DroneGridProps) {
         const screenX = centerX + x * scale
         const screenY = centerY - y * scale
 
+        const isSelected = selectedDroneId === target.id
+
         // Draw drone as a circle with pulsing effect
         const pulse = 0.8 + 0.2 * Math.sin(Date.now() / 200)
-        const radius = 6 * pulse
+        const radius = isSelected ? 8 * pulse : 6 * pulse
+
+        // Selection ring for selected drone
+        if (isSelected) {
+          ctx.strokeStyle = '#00ffff'
+          ctx.lineWidth = 3
+          ctx.beginPath()
+          ctx.arc(screenX, screenY, radius + 8, 0, 2 * Math.PI)
+          ctx.stroke()
+          
+          // Outer glow for selected drone
+          const selectedGradient = ctx.createRadialGradient(screenX, screenY, 0, screenX, screenY, radius + 12)
+          selectedGradient.addColorStop(0, `rgba(0, 255, 255, ${0.8 * pulse})`)
+          selectedGradient.addColorStop(1, 'rgba(0, 255, 255, 0)')
+          ctx.fillStyle = selectedGradient
+          ctx.beginPath()
+          ctx.arc(screenX, screenY, radius + 12, 0, 2 * Math.PI)
+          ctx.fill()
+        }
 
         // Outer glow
         const gradient = ctx.createRadialGradient(screenX, screenY, 0, screenX, screenY, radius + 5)
@@ -170,8 +235,8 @@ function DroneGrid({ targets, maxRange = 50_000 }: DroneGridProps) {
         ctx.arc(screenX, screenY, radius + 5, 0, 2 * Math.PI)
         ctx.fill()
 
-        // Main drone dot
-        ctx.fillStyle = '#ff3232'
+        // Main drone dot (cyan if selected, red otherwise)
+        ctx.fillStyle = isSelected ? '#00ffff' : '#ff3232'
         ctx.beginPath()
         ctx.arc(screenX, screenY, radius, 0, 2 * Math.PI)
         ctx.fill()
@@ -189,11 +254,11 @@ function DroneGrid({ targets, maxRange = 50_000 }: DroneGridProps) {
         )
         ctx.stroke()
 
-        // Draw drone ID label
-        ctx.fillStyle = '#ffffff'
-        ctx.font = 'bold 11px Arial'
+        // Draw drone ID label (highlighted if selected)
+        ctx.fillStyle = isSelected ? '#00ffff' : '#ffffff'
+        ctx.font = isSelected ? 'bold 13px Arial' : 'bold 11px Arial'
         ctx.textAlign = 'center'
-        ctx.fillText(`D${target.id}`, screenX, screenY - 15)
+        ctx.fillText(`D${target.id}`, screenX, screenY - (isSelected ? 18 : 15))
       })
 
       // Draw center (radar position)
@@ -232,16 +297,19 @@ function DroneGrid({ targets, maxRange = 50_000 }: DroneGridProps) {
         ref={canvasRef}
         width={size}
         height={size}
+        onClick={handleCanvasClick}
         style={{
           display: 'block',
           margin: '0 auto',
           border: '2px solid #444',
           borderRadius: '8px',
           background: '#0a0a1a',
+          cursor: 'pointer',
         }}
       />
       <div className="grid-info">
         <p>2D Position Plot - Range: 0 to {maxRange / 1000} km</p>
+        {onDroneSelect && <p style={{ fontSize: '12px', color: '#666', marginTop: '5px' }}>Click on a drone to select it</p>}
         <p className="grid-legend">
           <span className="legend-item">
             <span className="legend-dot" style={{ background: '#ff3232' }}></span>

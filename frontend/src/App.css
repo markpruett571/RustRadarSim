@@ -346,11 +346,218 @@ main {
   border-radius: 8px;
   padding: 20px;
   transition: border-color 0.3s, box-shadow 0.3s;
+  cursor: pointer;
 }
 
 .drone-item:hover {
   border-color: #ef4444;
   box-shadow: 0 2px 8px rgba(239, 68, 68, 0.2);
+}
+
+.drone-item.selected {
+  border-color: #00ffff;
+  border-width: 3px;
+  background: #f0fdfa;
+  box-shadow: 0 4px 12px rgba(0, 255, 255, 0.3);
+}
+
+.analyze-button {
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3);
+}
+
+.analyze-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+.analyze-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.analysis-status {
+  background: #dbeafe;
+  border: 2px solid #3b82f6;
+  border-radius: 6px;
+  padding: 10px;
+  margin-bottom: 15px;
+  color: #1e40af;
+  font-size: 14px;
+}
+
+.analysis-panel {
+  background: white;
+  border-radius: 12px;
+  padding: 25px;
+  margin-bottom: 30px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.analysis-panel h2 {
+  margin-top: 0;
+  color: #333;
+  border-bottom: 2px solid #3b82f6;
+  padding-bottom: 10px;
+}
+
+.analysis-content {
+  margin-top: 20px;
+}
+
+.analysis-section {
+  margin-bottom: 25px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.analysis-section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.analysis-section h3 {
+  margin: 0 0 15px 0;
+  color: #1f2937;
+  font-size: 1.1rem;
+}
+
+.threat-level {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 10px;
+}
+
+.threat-badge {
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.threat-badge.threat-low {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.threat-badge.threat-medium {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.threat-badge.threat-high {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.confidence {
+  color: #6b7280;
+  font-size: 0.9rem;
+}
+
+.estimated-type {
+  color: #374151;
+  font-weight: 600;
+  margin: 10px 0 0 0;
+}
+
+.trajectory-details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+}
+
+.trajectory-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px;
+  background: #f9fafb;
+  border-radius: 6px;
+}
+
+.trajectory-label {
+  color: #6b7280;
+  font-weight: 600;
+}
+
+.trajectory-value {
+  color: #1f2937;
+  font-weight: 600;
+}
+
+.risk-metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.risk-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.risk-label {
+  color: #6b7280;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.risk-bar {
+  position: relative;
+  width: 100%;
+  height: 24px;
+  background: #e5e7eb;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.risk-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #10b981 0%, #f59e0b 50%, #ef4444 100%);
+  transition: width 0.3s ease;
+  border-radius: 12px;
+}
+
+.risk-bar-fill.risk-overall {
+  background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 50%, #ec4899 100%);
+}
+
+.risk-value {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #1f2937;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.recommendations-list {
+  margin: 0;
+  padding-left: 20px;
+  color: #374151;
+}
+
+.recommendations-list li {
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+
+.recommendations-list li:last-child {
+  margin-bottom: 0;
 }
 
 .drone-header {
