@@ -18,55 +18,81 @@ use std::f64::consts::PI;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tower_http::cors::{Any, CorsLayer};
+use utoipa::{OpenApi, ToSchema};
+use utoipa_swagger_ui::SwaggerUi;
 
 /// Physical constants
 const C: f64 = 299_792_458.0;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 struct Target {
+    /// Range in meters
     range_m: f64,
+    /// Velocity in meters per second
     vel_m_s: f64,
-    rcs: f64, // amplitude scaling (simple)
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct SimulationParams {
-    fc: Option<f64>,        // carrier frequency (Hz)
-    fs: Option<f64>,        // sampling rate (Hz)
-    prf: Option<f64>,       // pulses per second
-    num_pulses: Option<usize>,
-    pulse_width: Option<f64>, // pulse width (seconds)
-    noise_sigma: Option<f64>,
-    targets: Option<Vec<Target>>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct SimulationResult {
-    range_doppler_map: Vec<Vec<f64>>, // [range_bins][doppler_bins]
-    range_profile: Vec<f64>,          // averaged magnitude per range bin
-    config: SimulationConfig,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct SimulationConfig {
-    n_range_bins: usize,
-    n_doppler_bins: usize,
-    fs: f64,
-    prf: f64,
-    fc: f64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct TargetPosition {
-    id: usize,
-    range_m: f64,
-    azimuth_deg: f64, // Angle in degrees (0-360)
-    vel_m_s: f64,
+    /// Radar cross section (amplitude scaling)
     rcs: f64,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+struct SimulationParams {
+    /// Carrier frequency in Hz (default: 10 GHz)
+    fc: Option<f64>,
+    /// Sampling rate in Hz (default: 1 MHz)
+    fs: Option<f64>,
+    /// Pulse repetition frequency in Hz (default: 500 Hz)
+    prf: Option<f64>,
+    /// Number of pulses (default: 32)
+    num_pulses: Option<usize>,
+    /// Pulse width in seconds (default: 50 μs)
+    pulse_width: Option<f64>,
+    /// Noise standard deviation (default: 0.1)
+    noise_sigma: Option<f64>,
+    /// List of targets to simulate
+    targets: Option<Vec<Target>>,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+struct SimulationResult {
+    /// Range-Doppler map as 2D array [range_bins][doppler_bins]
+    range_doppler_map: Vec<Vec<f64>>,
+    /// Averaged magnitude per range bin
+    range_profile: Vec<f64>,
+    /// Simulation configuration used
+    config: SimulationConfig,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+struct SimulationConfig {
+    /// Number of range bins
+    n_range_bins: usize,
+    /// Number of Doppler bins
+    n_doppler_bins: usize,
+    /// Sampling rate in Hz
+    fs: f64,
+    /// Pulse repetition frequency in Hz
+    prf: f64,
+    /// Carrier frequency in Hz
+    fc: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+struct TargetPosition {
+    /// Target identifier
+    id: usize,
+    /// Range in meters
+    range_m: f64,
+    /// Azimuth angle in degrees (0-360)
+    azimuth_deg: f64,
+    /// Velocity in meters per second
+    vel_m_s: f64,
+    /// Radar cross section
+    rcs: f64,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 #[serde(tag = "type")]
+#[schema(as = utoipa::openapi::Object)]
 enum WebSocketMessage {
     #[serde(rename = "simulate")]
     Simulate { params: SimulationParams },
@@ -82,8 +108,9 @@ enum WebSocketMessage {
     StartTracking { params: SimulationParams },
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 #[serde(tag = "type")]
+#[schema(as = utoipa::openapi::Object)]
 enum AnalysisWebSocketMessage {
     #[serde(rename = "analyze")]
     Analyze { drone_id: usize, target: TargetPosition },
@@ -95,28 +122,41 @@ enum AnalysisWebSocketMessage {
     AnalysisStatus { message: String },
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 struct DroneAnalysis {
+    /// Drone identifier
     drone_id: usize,
+    /// Threat level: "low", "medium", or "high"
     threat_level: String,
+    /// Estimated drone type
     estimated_type: String,
+    /// Confidence score (0.0 to 1.0)
     confidence: f64,
+    /// Trajectory analysis results
     trajectory_analysis: TrajectoryAnalysis,
+    /// Risk assessment results
     risk_assessment: RiskAssessment,
+    /// List of recommendations
     recommendations: Vec<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 struct TrajectoryAnalysis {
+    /// Heading in degrees
     heading_deg: f64,
+    /// Speed in meters per second
     speed_m_s: f64,
+    /// Estimated altitude in meters
     altitude_estimate_m: f64,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 struct RiskAssessment {
+    /// Proximity risk score (0-100)
     proximity_risk: f64,
+    /// Velocity risk score (0-100)
     velocity_risk: f64,
+    /// Overall risk score (0-100)
     overall_risk: f64,
 }
 
@@ -358,6 +398,22 @@ fn run_simulation(params: SimulationParams) -> Result<SimulationResult, Box<dyn 
     })
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/simulate",
+    params(
+        ("fc" = Option<f64>, Query, description = "Carrier frequency in Hz (default: 10 GHz)"),
+        ("fs" = Option<f64>, Query, description = "Sampling rate in Hz (default: 1 MHz)"),
+        ("prf" = Option<f64>, Query, description = "Pulse repetition frequency in Hz (default: 500 Hz)"),
+        ("num_pulses" = Option<usize>, Query, description = "Number of pulses (default: 32)"),
+        ("pulse_width" = Option<f64>, Query, description = "Pulse width in seconds (default: 50 μs)"),
+        ("noise_sigma" = Option<f64>, Query, description = "Noise standard deviation (default: 0.1)"),
+    ),
+    responses(
+        (status = 200, description = "Simulation result", body = SimulationResult)
+    ),
+    tag = "Simulation"
+)]
 async fn simulate_handler(_query: Query<HashMap<String, String>>) -> Json<SimulationResult> {
     // Use fixed radar parameters optimized for drone detection
     let sim_params = SimulationParams {
@@ -414,7 +470,7 @@ async fn handle_analysis_socket(socket: WebSocket) {
                         };
                         if let Ok(json) = serde_json::to_string(&status) {
                             let mut s = sender_arc.lock().await;
-                            let _ = s.send(Message::Text(json)).await;
+                            let _ = s.send(Message::Text(json.into())).await;
                         }
                         
                         // Run analysis on a separate thread (blocking task)
@@ -429,7 +485,7 @@ async fn handle_analysis_socket(socket: WebSocket) {
                                 let response = AnalysisWebSocketMessage::AnalysisResult { analysis };
                                 if let Ok(json) = serde_json::to_string(&response) {
                                     let mut s = sender_clone.lock().await;
-                                    let _ = s.send(Message::Text(json)).await;
+                                    let _ = s.send(Message::Text(json.into())).await;
                                 }
                             }
                             Err(e) => {
@@ -438,7 +494,7 @@ async fn handle_analysis_socket(socket: WebSocket) {
                                 };
                                 if let Ok(json) = serde_json::to_string(&error_msg) {
                                     let mut s = sender_clone.lock().await;
-                                    let _ = s.send(Message::Text(json)).await;
+                                    let _ = s.send(Message::Text(json.into())).await;
                                 }
                             }
                         }
@@ -452,7 +508,7 @@ async fn handle_analysis_socket(socket: WebSocket) {
                         };
                         if let Ok(json) = serde_json::to_string(&error_msg) {
                             let mut s = sender_arc.lock().await;
-                            let _ = s.send(Message::Text(json)).await;
+                            let _ = s.send(Message::Text(json.into())).await;
                         }
                     }
                 }
@@ -482,7 +538,7 @@ async fn handle_socket(socket: WebSocket) {
                         };
                         if let Ok(json) = serde_json::to_string(&status) {
                             let mut s = sender_arc.lock().await;
-                            let _ = s.send(Message::Text(json)).await;
+                            let _ = s.send(Message::Text(json.into())).await;
                         }
 
                         // Run simulation with fixed parameters
@@ -506,7 +562,7 @@ async fn handle_socket(socket: WebSocket) {
                                 let response = WebSocketMessage::Result(sim_result);
                                 if let Ok(json) = serde_json::to_string(&response) {
                                     let mut s = sender_clone.lock().await;
-                                    let _ = s.send(Message::Text(json)).await;
+                                    let _ = s.send(Message::Text(json.into())).await;
                                 }
                             }
                             Ok(Err(e)) => {
@@ -515,7 +571,7 @@ async fn handle_socket(socket: WebSocket) {
                                 };
                                 if let Ok(json) = serde_json::to_string(&error_msg) {
                                     let mut s = sender_clone.lock().await;
-                                    let _ = s.send(Message::Text(json)).await;
+                                    let _ = s.send(Message::Text(json.into())).await;
                                 }
                             }
                             Err(e) => {
@@ -524,7 +580,7 @@ async fn handle_socket(socket: WebSocket) {
                                 };
                                 if let Ok(json) = serde_json::to_string(&error_msg) {
                                     let mut s = sender_clone.lock().await;
-                                    let _ = s.send(Message::Text(json)).await;
+                                    let _ = s.send(Message::Text(json.into())).await;
                                 }
                             }
                         }
@@ -586,7 +642,7 @@ async fn handle_socket(socket: WebSocket) {
                                 };
                                 if let Ok(json) = serde_json::to_string(&msg) {
                                     let mut s = sender_clone.lock().await;
-                                    if s.send(Message::Text(json)).await.is_err() {
+                                    if s.send(Message::Text(json.into())).await.is_err() {
                                         break; // Connection closed
                                     }
                                 }
@@ -603,7 +659,7 @@ async fn handle_socket(socket: WebSocket) {
                         };
                         if let Ok(json) = serde_json::to_string(&error_msg) {
                             let mut s = sender_arc.lock().await;
-                            let _ = s.send(Message::Text(json)).await;
+                            let _ = s.send(Message::Text(json.into())).await;
                         }
                     }
                 }
@@ -619,6 +675,32 @@ async fn handle_socket(socket: WebSocket) {
     }
 }
 
+#[derive(OpenApi)]
+#[openapi(
+    paths(simulate_handler),
+    components(schemas(
+        SimulationResult,
+        SimulationParams,
+        SimulationConfig,
+        Target,
+        TargetPosition,
+        DroneAnalysis,
+        TrajectoryAnalysis,
+        RiskAssessment,
+        WebSocketMessage,
+        AnalysisWebSocketMessage
+    )),
+    tags(
+        (name = "Simulation", description = "Radar simulation endpoints")
+    ),
+    info(
+        title = "Radar Simulation API",
+        description = "API for radar simulation and drone analysis",
+        version = "1.0.0"
+    )
+)]
+struct ApiDoc;
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cors = CorsLayer::new()
@@ -630,6 +712,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/api/simulate", get(simulate_handler))
         .route("/ws", get(websocket_handler))
         .route("/ws/analyze", get(analysis_websocket_handler))
+        .merge(
+            SwaggerUi::new("/swagger-ui")
+                .url("/api-docs/openapi.json", ApiDoc::openapi())
+        )
         .layer(cors);
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:3001").await?;
@@ -637,6 +723,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("API endpoint: http://127.0.0.1:3001/api/simulate");
     println!("WebSocket endpoint: ws://127.0.0.1:3001/ws");
     println!("Analysis WebSocket endpoint: ws://127.0.0.1:3001/ws/analyze");
+    println!("Swagger UI: http://127.0.0.1:3001/swagger-ui/");
+    println!("OpenAPI JSON: http://127.0.0.1:3001/api-docs/openapi.json");
 
     axum::serve(listener, app).await?;
 
