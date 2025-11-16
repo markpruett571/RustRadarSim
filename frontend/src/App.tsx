@@ -4,8 +4,8 @@ import CircularRadar from './components/CircularRadar'
 import DroneGrid from './components/DroneGrid'
 import DetectionControls from './components/SimulationControls'
 import { useWebSocket } from './hooks/useWebSocket'
-import { useAnalysisWebSocket } from './hooks/useAnalysisWebSocket'
-import { SimulationResult, WebSocketMessage, TargetPosition, DroneAnalysis, AnalysisWebSocketMessage } from './types'
+import { useAnalysis } from './hooks/useAnalysis'
+import { SimulationResult, WebSocketMessage, TargetPosition, DroneAnalysis } from './types'
 
 function App() {
   const [data, setData] = useState<SimulationResult | null>(null)
@@ -16,11 +16,9 @@ function App() {
   const [tracking, setTracking] = useState(false)
   const [selectedDroneId, setSelectedDroneId] = useState<number | null>(null)
   const [analysisResult, setAnalysisResult] = useState<DroneAnalysis | null>(null)
-  const [analyzing, setAnalyzing] = useState(false)
-  const [analysisStatus, setAnalysisStatus] = useState<string | null>(null)
 
   const { socket, connected, error: wsError, send } = useWebSocket()
-  const { socket: analysisSocket, connected: analysisConnected, error: analysisError, send: sendAnalysis } = useAnalysisWebSocket()
+  const { analyze, analyzing, error: analysisError } = useAnalysis()
 
   // Handle WebSocket messages
   useEffect(() => {
@@ -89,41 +87,9 @@ function App() {
     }
   }, [connected, tracking, handleStartDetection])
 
-  // Handle analysis WebSocket messages
-  useEffect(() => {
-    if (!analysisSocket) return
-
-    analysisSocket.onmessage = (event: MessageEvent) => {
-      try {
-        const message = JSON.parse(event.data) as AnalysisWebSocketMessage
-        
-        switch (message.type) {
-          case 'analysis_result':
-            setAnalysisResult(message.analysis)
-            setAnalyzing(false)
-            setAnalysisStatus(null)
-            break
-          case 'analysis_error':
-            setAnalyzing(false)
-            setAnalysisStatus(null)
-            setError(message.message)
-            break
-          case 'analysis_status':
-            setAnalysisStatus(message.message)
-            break
-          default:
-            console.log('Unknown analysis message type:', (message as { type: string }).type)
-        }
-      } catch (err) {
-        console.error('Error parsing analysis WebSocket message:', err)
-        setError('Failed to parse analysis server message')
-      }
-    }
-  }, [analysisSocket])
-
-  const handleAnalyze = useCallback(() => {
-    if (!analysisConnected || !sendAnalysis || selectedDroneId === null) {
-      setError('Analysis WebSocket not connected or no drone selected')
+  const handleAnalyze = useCallback(async () => {
+    if (selectedDroneId === null) {
+      setError('No drone selected')
       return
     }
 
@@ -133,18 +99,14 @@ function App() {
       return
     }
 
-    setAnalyzing(true)
     setAnalysisResult(null)
-    setAnalysisStatus(null)
     setError(null)
 
-    const message: AnalysisWebSocketMessage = {
-      type: 'analyze',
-      drone_id: selectedDroneId,
-      target: selectedTarget
+    const result = await analyze(selectedTarget)
+    if (result) {
+      setAnalysisResult(result)
     }
-    sendAnalysis(message)
-  }, [analysisConnected, sendAnalysis, selectedDroneId, targets])
+  }, [analyze, selectedDroneId, targets])
 
   const displayError = error || wsError || analysisError
 
@@ -215,7 +177,7 @@ function App() {
               {selectedDroneId !== null && (
                 <button 
                   onClick={handleAnalyze}
-                  disabled={!analysisConnected || analyzing}
+                  disabled={analyzing}
                   className="analyze-button"
                 >
                   {analyzing ? 'Analyzing...' : 'Analyze Selected Drone'}
@@ -296,11 +258,6 @@ function App() {
                     </div>
                   </div>
                 </div>
-                {analysisStatus && (
-                  <div className="analysis-status">
-                    <p>{analysisStatus}</p>
-                  </div>
-                )}
               </div>
             ) : analysisResult ? (
               <>

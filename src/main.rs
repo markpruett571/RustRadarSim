@@ -11,7 +11,7 @@ use utoipa_swagger_ui::SwaggerUi;
 
 #[derive(OpenApi)]
 #[openapi(
-    paths(radar_sim::handlers::simulate_handler),
+    paths(radar_sim::handlers::simulate_handler, radar_sim::handlers::analyze_handler),
     components(schemas(
         SimulationResult,
         SimulationParams,
@@ -25,7 +25,8 @@ use utoipa_swagger_ui::SwaggerUi;
         AnalysisWebSocketMessage
     )),
     tags(
-        (name = "Simulation", description = "Radar simulation endpoints")
+        (name = "Simulation", description = "Radar simulation endpoints"),
+        (name = "Analysis", description = "Drone analysis endpoints")
     ),
     info(
         title = "Radar Simulation API",
@@ -52,6 +53,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:3001").await?;
     println!("Server running on http://127.0.0.1:3001");
     println!("API endpoint: http://127.0.0.1:3001/api/simulate");
+    println!("Analysis API endpoint: http://127.0.0.1:3001/api/analyze");
     println!("WebSocket endpoint: ws://127.0.0.1:3001/ws");
     println!("Analysis WebSocket endpoint: ws://127.0.0.1:3001/ws/analyze");
     println!("Swagger UI: http://127.0.0.1:3001/swagger-ui/");

@@ -2,7 +2,7 @@ use crate::analysis::analyze_drone;
 use crate::simulation::run_simulation;
 use crate::types::{
     AnalysisWebSocketMessage, SimulationParams, SimulationResult, SimulationConfig,
-    Target, TargetPosition, WebSocketMessage,
+    Target, TargetPosition, WebSocketMessage, DroneAnalysis,
 };
 use axum::{
     extract::{
@@ -10,6 +10,7 @@ use axum::{
         Query,
     },
     response::Json,
+    http::StatusCode,
 };
 use futures_util::{SinkExt, StreamExt};
 use std::collections::HashMap;
@@ -60,6 +61,34 @@ pub async fn simulate_handler(_query: Query<HashMap<String, String>>) -> Json<Si
                     fc: 10.0e9,
                 },
             })
+        }
+    }
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/analyze",
+    request_body = TargetPosition,
+    responses(
+        (status = 200, description = "Analysis result", body = DroneAnalysis),
+        (status = 400, description = "Bad request")
+    ),
+    tag = "Analysis"
+)]
+pub async fn analyze_handler(
+    axum::extract::Json(target): axum::extract::Json<TargetPosition>,
+) -> Result<Json<DroneAnalysis>, StatusCode> {
+    // Run analysis on a separate thread (blocking task)
+    // This ensures it doesn't block the async runtime
+    let analysis_result = tokio::task::spawn_blocking(move || {
+        analyze_drone(&target)
+    }).await;
+
+    match analysis_result {
+        Ok(analysis) => Ok(Json(analysis)),
+        Err(e) => {
+            eprintln!("Analysis task error: {}", e);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
 }
