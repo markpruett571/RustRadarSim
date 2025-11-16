@@ -165,7 +165,30 @@ function App() {
           onStartDetection={handleStartDetection}
           tracking={tracking}
           connected={connected}
-        />
+          />
+
+        {targets.length > 0 && (
+            <div className="visualizations">
+              <div className="chart-container">
+                <h2>2D Position Grid</h2>
+                <DroneGrid 
+                  targets={targets} 
+                  maxRange={50_000}
+                  selectedDroneId={selectedDroneId}
+                  onDroneSelect={setSelectedDroneId}
+                />
+              </div>
+            </div>
+          )}
+    
+        {data && !loading && (
+          <div className="visualizations">
+            <div className="chart-container">
+              <h2>Radar Display</h2>
+              <CircularRadar data={data.range_doppler_map} config={data.config} targets={targets} />
+            </div>
+          </div>
+        )}
 
         {displayError && (
           <div className="error">
@@ -199,11 +222,6 @@ function App() {
                 </button>
               )}
             </div>
-            {analysisStatus && (
-              <div className="analysis-status">
-                <p>{analysisStatus}</p>
-              </div>
-            )}
             <div className="drone-list">
               {targets.map((target) => {
                 const isSelected = selectedDroneId === target.id
@@ -242,107 +260,133 @@ function App() {
           </div>
         )}
 
-        {analysisResult && (
+        {(selectedDroneId !== null || analyzing || analysisResult) && (
           <div className="analysis-panel">
-            <h2>Analysis Results - Drone #{analysisResult.drone_id}</h2>
-            <div className="analysis-content">
-              <div className="analysis-section">
-                <h3>Threat Assessment</h3>
-                <div className="threat-level">
-                  <span className={`threat-badge threat-${analysisResult.threat_level}`}>
-                    {analysisResult.threat_level.toUpperCase()}
-                  </span>
-                  <span className="confidence">Confidence: {(analysisResult.confidence * 100).toFixed(1)}%</span>
-                </div>
-                <p className="estimated-type">Estimated Type: {analysisResult.estimated_type}</p>
-              </div>
-
-              <div className="analysis-section">
-                <h3>Trajectory Analysis</h3>
-                <div className="trajectory-details">
-                  <div className="trajectory-item">
-                    <span className="trajectory-label">Heading:</span>
-                    <span className="trajectory-value">{analysisResult.trajectory_analysis.heading_deg.toFixed(1)}°</span>
+            {analyzing && !analysisResult ? (
+              <div className="analysis-loading">
+                <h2>Analyzing Drone #{selectedDroneId}</h2>
+                <div className="analysis-skeleton">
+                  <div className="skeleton-section">
+                    <div className="skeleton-header"></div>
+                    <div className="skeleton-badge"></div>
+                    <div className="skeleton-text"></div>
                   </div>
-                  <div className="trajectory-item">
-                    <span className="trajectory-label">Speed:</span>
-                    <span className="trajectory-value">{analysisResult.trajectory_analysis.speed_m_s.toFixed(1)} m/s</span>
-                  </div>
-                  <div className="trajectory-item">
-                    <span className="trajectory-label">Altitude Estimate:</span>
-                    <span className="trajectory-value">{analysisResult.trajectory_analysis.altitude_estimate_m.toFixed(0)} m</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="analysis-section">
-                <h3>Risk Assessment</h3>
-                <div className="risk-metrics">
-                  <div className="risk-item">
-                    <span className="risk-label">Proximity Risk:</span>
-                    <div className="risk-bar">
-                      <div 
-                        className="risk-bar-fill" 
-                        style={{ width: `${analysisResult.risk_assessment.proximity_risk}%` }}
-                      ></div>
-                      <span className="risk-value">{analysisResult.risk_assessment.proximity_risk.toFixed(1)}%</span>
+                  <div className="skeleton-section">
+                    <div className="skeleton-header"></div>
+                    <div className="skeleton-grid">
+                      <div className="skeleton-item"></div>
+                      <div className="skeleton-item"></div>
+                      <div className="skeleton-item"></div>
                     </div>
                   </div>
-                  <div className="risk-item">
-                    <span className="risk-label">Velocity Risk:</span>
-                    <div className="risk-bar">
-                      <div 
-                        className="risk-bar-fill" 
-                        style={{ width: `${analysisResult.risk_assessment.velocity_risk}%` }}
-                      ></div>
-                      <span className="risk-value">{analysisResult.risk_assessment.velocity_risk.toFixed(1)}%</span>
+                  <div className="skeleton-section">
+                    <div className="skeleton-header"></div>
+                    <div className="skeleton-bars">
+                      <div className="skeleton-bar"></div>
+                      <div className="skeleton-bar"></div>
+                      <div className="skeleton-bar"></div>
                     </div>
                   </div>
-                  <div className="risk-item">
-                    <span className="risk-label">Overall Risk:</span>
-                    <div className="risk-bar">
-                      <div 
-                        className="risk-bar-fill risk-overall" 
-                        style={{ width: `${analysisResult.risk_assessment.overall_risk}%` }}
-                      ></div>
-                      <span className="risk-value">{analysisResult.risk_assessment.overall_risk.toFixed(1)}%</span>
+                  <div className="skeleton-section">
+                    <div className="skeleton-header"></div>
+                    <div className="skeleton-list">
+                      <div className="skeleton-list-item"></div>
+                      <div className="skeleton-list-item"></div>
+                      <div className="skeleton-list-item"></div>
                     </div>
                   </div>
                 </div>
+                {analysisStatus && (
+                  <div className="analysis-status">
+                    <p>{analysisStatus}</p>
+                  </div>
+                )}
               </div>
+            ) : analysisResult ? (
+              <>
+                <h2>Analysis Results - Drone #{analysisResult.drone_id}</h2>
+                <div className="analysis-content">
+                  <div className="analysis-section">
+                    <h3>Threat Assessment</h3>
+                    <div className="threat-level">
+                      <span className={`threat-badge threat-${analysisResult.threat_level}`}>
+                        {analysisResult.threat_level.toUpperCase()}
+                      </span>
+                      <span className="confidence">Confidence: {(analysisResult.confidence * 100).toFixed(1)}%</span>
+                    </div>
+                    <p className="estimated-type">Estimated Type: {analysisResult.estimated_type}</p>
+                  </div>
 
-              <div className="analysis-section">
-                <h3>Recommendations</h3>
-                <ul className="recommendations-list">
-                  {analysisResult.recommendations.map((rec, idx) => (
-                    <li key={idx}>{rec}</li>
-                  ))}
-                </ul>
+                  <div className="analysis-section">
+                    <h3>Trajectory Analysis</h3>
+                    <div className="trajectory-details">
+                      <div className="trajectory-item">
+                        <span className="trajectory-label">Heading:</span>
+                        <span className="trajectory-value">{analysisResult.trajectory_analysis.heading_deg.toFixed(1)}°</span>
+                      </div>
+                      <div className="trajectory-item">
+                        <span className="trajectory-label">Speed:</span>
+                        <span className="trajectory-value">{analysisResult.trajectory_analysis.speed_m_s.toFixed(1)} m/s</span>
+                      </div>
+                      <div className="trajectory-item">
+                        <span className="trajectory-label">Altitude Estimate:</span>
+                        <span className="trajectory-value">{analysisResult.trajectory_analysis.altitude_estimate_m.toFixed(0)} m</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="analysis-section">
+                    <h3>Risk Assessment</h3>
+                    <div className="risk-metrics">
+                      <div className="risk-item">
+                        <span className="risk-label">Proximity Risk:</span>
+                        <div className="risk-bar">
+                          <div 
+                            className="risk-bar-fill" 
+                            style={{ width: `${analysisResult.risk_assessment.proximity_risk}%` }}
+                          ></div>
+                          <span className="risk-value">{analysisResult.risk_assessment.proximity_risk.toFixed(1)}%</span>
+                        </div>
+                      </div>
+                      <div className="risk-item">
+                        <span className="risk-label">Velocity Risk:</span>
+                        <div className="risk-bar">
+                          <div 
+                            className="risk-bar-fill" 
+                            style={{ width: `${analysisResult.risk_assessment.velocity_risk}%` }}
+                          ></div>
+                          <span className="risk-value">{analysisResult.risk_assessment.velocity_risk.toFixed(1)}%</span>
+                        </div>
+                      </div>
+                      <div className="risk-item">
+                        <span className="risk-label">Overall Risk:</span>
+                        <div className="risk-bar">
+                          <div 
+                            className="risk-bar-fill risk-overall" 
+                            style={{ width: `${analysisResult.risk_assessment.overall_risk}%` }}
+                          ></div>
+                          <span className="risk-value">{analysisResult.risk_assessment.overall_risk.toFixed(1)}%</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="analysis-section">
+                    <h3>Recommendations</h3>
+                    <ul className="recommendations-list">
+                      {analysisResult.recommendations.map((rec, idx) => (
+                        <li key={idx}>{rec}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="analysis-placeholder">
+                <h2>Analysis Panel</h2>
+                <p>Select a drone and click "Analyze Selected Drone" to view detailed analysis results.</p>
               </div>
-            </div>
-          </div>
-        )}
-
-        {targets.length > 0 && (
-          <div className="visualizations">
-            <div className="chart-container">
-              <h2>2D Position Grid</h2>
-              <DroneGrid 
-                targets={targets} 
-                maxRange={50_000}
-                selectedDroneId={selectedDroneId}
-                onDroneSelect={setSelectedDroneId}
-              />
-            </div>
-          </div>
-        )}
-
-        {data && !loading && (
-          <div className="visualizations">
-            <div className="chart-container">
-              <h2>Radar Display</h2>
-              <CircularRadar data={data.range_doppler_map} config={data.config} targets={targets} />
-            </div>
+            )}
           </div>
         )}
       </main>

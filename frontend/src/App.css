@@ -218,6 +218,7 @@ main {
 .visualizations {
   display: grid;
   gap: 30px;
+  margin-bottom: 30px;
 }
 
 .chart-container {
@@ -400,6 +401,8 @@ main {
   padding: 25px;
   margin-bottom: 30px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  min-height: 500px;
+  transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
 .analysis-panel h2 {
@@ -411,6 +414,7 @@ main {
 
 .analysis-content {
   margin-top: 20px;
+  animation: fadeIn 0.4s ease;
 }
 
 .analysis-section {
@@ -558,6 +562,143 @@ main {
 
 .recommendations-list li:last-child {
   margin-bottom: 0;
+}
+
+.analysis-loading {
+  animation: fadeIn 0.3s ease;
+}
+
+.analysis-placeholder {
+  text-align: center;
+  padding: 40px 20px;
+  color: #6b7280;
+}
+
+.analysis-placeholder h2 {
+  margin-bottom: 15px;
+  color: #9ca3af;
+}
+
+.analysis-placeholder p {
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+.analysis-skeleton {
+  margin-top: 20px;
+}
+
+.skeleton-section {
+  margin-bottom: 25px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.skeleton-section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.skeleton-header {
+  height: 24px;
+  width: 200px;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  border-radius: 4px;
+  margin-bottom: 15px;
+  animation: skeleton-loading 1.5s ease-in-out infinite;
+}
+
+.skeleton-badge {
+  height: 32px;
+  width: 120px;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  border-radius: 20px;
+  margin-bottom: 10px;
+  animation: skeleton-loading 1.5s ease-in-out infinite;
+}
+
+.skeleton-text {
+  height: 20px;
+  width: 250px;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  border-radius: 4px;
+  animation: skeleton-loading 1.5s ease-in-out infinite;
+}
+
+.skeleton-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+}
+
+.skeleton-item {
+  height: 60px;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  border-radius: 6px;
+  animation: skeleton-loading 1.5s ease-in-out infinite;
+}
+
+.skeleton-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.skeleton-bar {
+  height: 24px;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  border-radius: 12px;
+  animation: skeleton-loading 1.5s ease-in-out infinite;
+}
+
+.skeleton-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-left: 20px;
+}
+
+.skeleton-list-item {
+  height: 20px;
+  width: 80%;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  border-radius: 4px;
+  animation: skeleton-loading 1.5s ease-in-out infinite;
+}
+
+.skeleton-list-item:nth-child(2) {
+  width: 70%;
+}
+
+.skeleton-list-item:nth-child(3) {
+  width: 85%;
+}
+
+@keyframes skeleton-loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .drone-header {
