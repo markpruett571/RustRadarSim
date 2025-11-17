@@ -15,7 +15,6 @@ pub struct TargetPosition {
     pub rcs: f64,
 }
 
-
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 #[serde(tag = "type")]
 #[schema(as = utoipa::openapi::Object)]
@@ -35,7 +34,10 @@ pub enum WebSocketMessage {
 #[schema(as = utoipa::openapi::Object)]
 pub enum AnalysisWebSocketMessage {
     #[serde(rename = "analyze")]
-    Analyze { drone_id: usize, target: TargetPosition },
+    Analyze {
+        drone_id: usize,
+        target: TargetPosition,
+    },
     #[serde(rename = "analysis_result")]
     AnalysisResult { analysis: DroneAnalysis },
     #[serde(rename = "analysis_error")]
@@ -81,4 +83,3 @@ pub struct RiskAssessment {
     /// Overall risk score (0-100)
     pub overall_risk: f64,
 }
-

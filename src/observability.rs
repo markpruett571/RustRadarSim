@@ -89,7 +89,7 @@ impl Default for AppMetrics {
 /// Health check endpoint handler
 pub async fn health_handler(State(metrics): State<Arc<AppMetrics>>) -> impl IntoResponse {
     let uptime = metrics.uptime_seconds();
-    
+
     let health = HealthStatus {
         status: "healthy".to_string(),
         version: env!("CARGO_PKG_VERSION").to_string(),
@@ -101,7 +101,10 @@ pub async fn health_handler(State(metrics): State<Arc<AppMetrics>>) -> impl Into
         },
     };
 
-    info!("Health check requested - status: healthy, uptime: {}s", uptime);
+    info!(
+        "Health check requested - status: healthy, uptime: {}s",
+        uptime
+    );
     (StatusCode::OK, Json(health))
 }
 
@@ -124,7 +127,7 @@ pub async fn metrics_handler(State(metrics): State<Arc<AppMetrics>>) -> impl Int
     let failed = *metrics.failed_requests.read().await;
     let ws_connections = *metrics.active_websocket_connections.read().await;
     let analysis_ops = *metrics.analysis_operations.read().await;
-    
+
     let success_rate = if total > 0 {
         (success as f64 / total as f64) * 100.0
     } else {
@@ -146,8 +149,8 @@ pub async fn metrics_handler(State(metrics): State<Arc<AppMetrics>>) -> impl Int
 
 /// Initialize tracing subscriber for structured logging
 pub fn init_tracing() {
-    let filter = std::env::var("RUST_LOG")
-        .unwrap_or_else(|_| "radar_sim=info,tower_http=info".to_string());
+    let filter =
+        std::env::var("RUST_LOG").unwrap_or_else(|_| "radar_sim=info,tower_http=info".to_string());
 
     let filter_clone = filter.clone();
     tracing_subscriber::fmt()
@@ -160,4 +163,3 @@ pub fn init_tracing() {
 
     info!("Tracing initialized with filter: {}", filter_clone);
 }
-

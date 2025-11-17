@@ -4,10 +4,10 @@ pub fn analyze_drone(target: &TargetPosition) -> DroneAnalysis {
     // Simulate analysis computation (this would be more complex in reality)
     use std::time::Duration;
     std::thread::sleep(Duration::from_millis(500)); // Simulate processing time
-    
+
     let speed = target.vel_m_s.abs();
     let range_km = target.range_m / 1000.0;
-    
+
     // Determine threat level
     let threat_level = if range_km < 5.0 && speed > 40.0 {
         "high"
@@ -16,7 +16,7 @@ pub fn analyze_drone(target: &TargetPosition) -> DroneAnalysis {
     } else {
         "low"
     };
-    
+
     // Estimate drone type based on characteristics
     let estimated_type = if speed > 50.0 {
         "Racing/High-Speed"
@@ -25,10 +25,10 @@ pub fn analyze_drone(target: &TargetPosition) -> DroneAnalysis {
     } else {
         "Consumer/Small"
     };
-    
+
     // Calculate confidence based on RCS and consistency
     let confidence = (target.rcs * 0.6 + 0.4).min(1.0);
-    
+
     // Trajectory analysis
     let heading_deg = target.azimuth_deg;
     let altitude_estimate_m = if range_km < 2.0 {
@@ -36,12 +36,12 @@ pub fn analyze_drone(target: &TargetPosition) -> DroneAnalysis {
     } else {
         100.0 + (range_km * 20.0)
     };
-    
+
     // Risk assessment
     let proximity_risk = (1.0 - (range_km / 50.0).min(1.0)) * 100.0;
     let velocity_risk = (speed / 100.0).min(1.0) * 100.0;
     let overall_risk = (proximity_risk * 0.6 + velocity_risk * 0.4).min(100.0);
-    
+
     // Generate recommendations
     let mut recommendations = Vec::new();
     if proximity_risk > 70.0 {
@@ -56,7 +56,7 @@ pub fn analyze_drone(target: &TargetPosition) -> DroneAnalysis {
     if recommendations.is_empty() {
         recommendations.push("Continue monitoring - no immediate action required".to_string());
     }
-    
+
     DroneAnalysis {
         drone_id: target.id,
         threat_level: threat_level.to_string(),
@@ -92,7 +92,7 @@ mod tests {
         };
 
         let analysis = analyze_drone(&target);
-        
+
         assert_eq!(analysis.drone_id, 1);
         assert_eq!(analysis.threat_level, "high");
         assert!(analysis.confidence > 0.0 && analysis.confidence <= 1.0);
@@ -113,7 +113,7 @@ mod tests {
         };
 
         let analysis = analyze_drone(&target);
-        
+
         assert_eq!(analysis.threat_level, "medium");
         assert_eq!(analysis.trajectory_analysis.speed_m_s, 35.0);
     }
@@ -129,7 +129,7 @@ mod tests {
         };
 
         let analysis = analyze_drone(&target);
-        
+
         assert_eq!(analysis.threat_level, "low");
         assert_eq!(analysis.trajectory_analysis.speed_m_s, 15.0);
     }
@@ -145,7 +145,7 @@ mod tests {
         };
 
         let analysis = analyze_drone(&target);
-        
+
         assert_eq!(analysis.estimated_type, "Racing/High-Speed");
     }
 
@@ -160,7 +160,7 @@ mod tests {
         };
 
         let analysis = analyze_drone(&target);
-        
+
         assert_eq!(analysis.estimated_type, "Commercial/Large");
     }
 
@@ -175,7 +175,7 @@ mod tests {
         };
 
         let analysis = analyze_drone(&target);
-        
+
         assert_eq!(analysis.estimated_type, "Consumer/Small");
     }
 
@@ -199,7 +199,7 @@ mod tests {
 
         let analysis_high = analyze_drone(&target_high_rcs);
         let analysis_low = analyze_drone(&target_low_rcs);
-        
+
         // Higher RCS should generally lead to higher confidence
         assert!(analysis_high.confidence >= analysis_low.confidence);
         assert!(analysis_high.confidence > 0.0 && analysis_high.confidence <= 1.0);
@@ -226,10 +226,15 @@ mod tests {
 
         let analysis_close = analyze_drone(&target_close);
         let analysis_far = analyze_drone(&target_far);
-        
+
         // Closer target should have higher proximity risk
-        assert!(analysis_close.risk_assessment.proximity_risk > analysis_far.risk_assessment.proximity_risk);
-        assert!(analysis_close.risk_assessment.overall_risk > analysis_far.risk_assessment.overall_risk);
+        assert!(
+            analysis_close.risk_assessment.proximity_risk
+                > analysis_far.risk_assessment.proximity_risk
+        );
+        assert!(
+            analysis_close.risk_assessment.overall_risk > analysis_far.risk_assessment.overall_risk
+        );
     }
 
     #[test]
@@ -243,7 +248,7 @@ mod tests {
         };
 
         let analysis = analyze_drone(&target_high_risk);
-        
+
         // Should have multiple recommendations for high-risk scenario
         assert!(!analysis.recommendations.is_empty());
         assert!(analysis.recommendations.len() >= 1);
@@ -260,7 +265,7 @@ mod tests {
         };
 
         let analysis = analyze_drone(&target);
-        
+
         // Speed should be absolute value
         assert_eq!(analysis.trajectory_analysis.speed_m_s, 30.0);
     }
@@ -285,12 +290,14 @@ mod tests {
 
         let analysis_close = analyze_drone(&target_close);
         let analysis_far = analyze_drone(&target_far);
-        
+
         // Altitude estimate should be reasonable
         assert!(analysis_close.trajectory_analysis.altitude_estimate_m > 0.0);
         assert!(analysis_far.trajectory_analysis.altitude_estimate_m > 0.0);
         // Far target should have higher altitude estimate
-        assert!(analysis_far.trajectory_analysis.altitude_estimate_m > analysis_close.trajectory_analysis.altitude_estimate_m);
+        assert!(
+            analysis_far.trajectory_analysis.altitude_estimate_m
+                > analysis_close.trajectory_analysis.altitude_estimate_m
+        );
     }
 }
-

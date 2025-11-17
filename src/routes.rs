@@ -13,4 +13,3 @@ pub fn create_router(metrics: Arc<AppMetrics>) -> Router {
         .route("/metrics", get(metrics_handler))
         .with_state(metrics)
 }
-

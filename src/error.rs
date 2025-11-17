@@ -69,4 +69,3 @@ impl IntoResponse for AppError {
 
 /// Result type alias for application errors
 pub type AppResult<T> = Result<T, AppError>;
-

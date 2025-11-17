@@ -1,9 +1,10 @@
+use axum::http::HeaderValue;
 use axum::http::Method;
 use radar_sim::observability::{init_tracing, AppMetrics};
 use radar_sim::routes::create_router;
 use radar_sim::types::{
-    AnalysisWebSocketMessage, DroneAnalysis, RiskAssessment,
-    TargetPosition, TrajectoryAnalysis, WebSocketMessage,
+    AnalysisWebSocketMessage, DroneAnalysis, RiskAssessment, TargetPosition, TrajectoryAnalysis,
+    WebSocketMessage,
 };
 use std::sync::Arc;
 use tower::ServiceBuilder;
@@ -12,7 +13,6 @@ use tower_http::{
     timeout::TimeoutLayer,
     trace::TraceLayer,
 };
-use axum::http::HeaderValue;
 use tracing::info;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
@@ -56,15 +56,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .split(',')
             .map(|s| s.trim().parse())
             .collect();
-        
+
         match origins {
-            Ok(origins_vec) if !origins_vec.is_empty() => {
-                CorsLayer::new()
-                    .allow_origin(AllowOrigin::list(origins_vec))
-                    .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
-                    .allow_headers(Any)
-                    .allow_credentials(true)
-            }
+            Ok(origins_vec) if !origins_vec.is_empty() => CorsLayer::new()
+                .allow_origin(AllowOrigin::list(origins_vec))
+                .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
+                .allow_headers(Any)
+                .allow_credentials(true),
             _ => {
                 // Fallback to allowing all if parsing fails
                 CorsLayer::new()
@@ -88,14 +86,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .layer(cors);
 
     let app = create_router(metrics.clone())
-        .merge(
-            SwaggerUi::new("/swagger-ui")
-                .url("/api-docs/openapi.json", ApiDoc::openapi())
-        )
+        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .layer(middleware_stack);
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:3001").await?;
-    
+
     info!("Server starting on http://127.0.0.1:3001");
     info!("Analysis API endpoint: http://127.0.0.1:3001/api/analyze");
     info!("Drone Tracking WebSocket endpoint: ws://127.0.0.1:3001/ws");

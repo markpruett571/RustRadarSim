@@ -1,12 +1,13 @@
 use crate::analysis::analyze_drone;
 use crate::observability::AppMetrics;
-use crate::types::{
-    AnalysisWebSocketMessage, TargetPosition, DroneAnalysis, WebSocketMessage,
-};
+use crate::types::{AnalysisWebSocketMessage, DroneAnalysis, TargetPosition, WebSocketMessage};
 use axum::{
-    extract::{State, ws::{Message, WebSocket, WebSocketUpgrade}},
-    response::Json,
+    extract::{
+        ws::{Message, WebSocket, WebSocketUpgrade},
+        State,
+    },
     http::StatusCode,
+    response::Json,
 };
 use futures_util::{SinkExt, StreamExt};
 use std::sync::Arc;
@@ -28,14 +29,14 @@ pub async fn analyze_handler(
     axum::extract::Json(target): axum::extract::Json<TargetPosition>,
 ) -> Result<Json<DroneAnalysis>, StatusCode> {
     metrics.increment_requests().await;
-    
+
     // Validate input
     if target.range_m < 0.0 || target.range_m > 100_000.0 {
         metrics.increment_failure().await;
         warn!("Invalid range: {}", target.range_m);
         return Err(StatusCode::BAD_REQUEST);
     }
-    
+
     if target.azimuth_deg < 0.0 || target.azimuth_deg >= 360.0 {
         metrics.increment_failure().await;
         warn!("Invalid azimuth: {}", target.azimuth_deg);
@@ -44,19 +45,23 @@ pub async fn analyze_handler(
 
     let target_id = target.id;
     let target_range = target.range_m;
-    info!("Analyzing target: id={}, range={}m", target_id, target_range);
-    
+    info!(
+        "Analyzing target: id={}, range={}m",
+        target_id, target_range
+    );
+
     // Run analysis on a separate thread (blocking task)
     // This ensures it doesn't block the async runtime
-    let analysis_result = tokio::task::spawn_blocking(move || {
-        analyze_drone(&target)
-    }).await;
+    let analysis_result = tokio::task::spawn_blocking(move || analyze_drone(&target)).await;
 
     match analysis_result {
         Ok(analysis) => {
             metrics.increment_success().await;
             metrics.increment_analysis().await;
-            info!("Analysis completed successfully for target id={}", target_id);
+            info!(
+                "Analysis completed successfully for target id={}",
+                target_id
+            );
             Ok(Json(analysis))
         }
         Err(e) => {
@@ -127,18 +132,19 @@ async fn handle_socket(socket: WebSocket, metrics: Arc<AppMetrics>) {
                         ];
 
                         let handle = tokio::spawn(async move {
-                            let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(100));
+                            let mut interval =
+                                tokio::time::interval(tokio::time::Duration::from_millis(100));
                             loop {
                                 interval.tick().await;
-                                
+
                                 // Update target positions
                                 for pos in &mut target_positions {
                                     // Update range based on velocity (negative velocity = moving away)
                                     pos.range_m += pos.vel_m_s * 0.1; // 0.1 seconds per update
-                                    
+
                                     // Update azimuth (circular motion for demo)
                                     pos.azimuth_deg = (pos.azimuth_deg + 0.5) % 360.0;
-                                    
+
                                     // Keep range within reasonable bounds
                                     if pos.range_m < 1000.0 {
                                         pos.range_m = 1000.0;
@@ -195,7 +201,7 @@ async fn handle_analysis_socket(socket: WebSocket, metrics: Arc<AppMetrics>) {
     info!("Analysis WebSocket connection established");
     let (sender, mut receiver) = socket.split();
     let sender_arc = Arc::new(Mutex::new(sender));
-    
+
     // Handle incoming messages
     while let Some(Ok(msg)) = receiver.next().await {
         match msg {
@@ -210,17 +216,17 @@ async fn handle_analysis_socket(socket: WebSocket, metrics: Arc<AppMetrics>) {
                             let mut s = sender_arc.lock().await;
                             let _ = s.send(Message::Text(json.into())).await;
                         }
-                        
+
                         // Run analysis on a separate thread (blocking task)
                         // This ensures it doesn't block the async runtime
                         let sender_clone = sender_arc.clone();
-                        let analysis_result = tokio::task::spawn_blocking(move || {
-                            analyze_drone(&target)
-                        }).await;
-                        
+                        let analysis_result =
+                            tokio::task::spawn_blocking(move || analyze_drone(&target)).await;
+
                         match analysis_result {
                             Ok(analysis) => {
-                                let response = AnalysisWebSocketMessage::AnalysisResult { analysis };
+                                let response =
+                                    AnalysisWebSocketMessage::AnalysisResult { analysis };
                                 if let Ok(json) = serde_json::to_string(&response) {
                                     let mut s = sender_clone.lock().await;
                                     let _ = s.send(Message::Text(json.into())).await;
@@ -261,13 +267,12 @@ async fn handle_analysis_socket(socket: WebSocket, metrics: Arc<AppMetrics>) {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::routes::create_router;
     use axum::body::Body;
     use axum::http::{Request, StatusCode};
-    use crate::routes::create_router;
     use http_body_util::BodyExt;
     use tower::ServiceExt;
 
@@ -278,7 +283,7 @@ mod tests {
     async fn test_analyze_handler_success() {
         let metrics = Arc::new(AppMetrics::new());
         let app = create_router(metrics);
-        
+
         let target = TargetPosition {
             id: 1,
             range_m: 10_000.0,
@@ -300,10 +305,10 @@ mod tests {
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::OK);
-        
+
         let body = response.into_body().collect().await.unwrap().to_bytes();
         let analysis: DroneAnalysis = serde_json::from_slice(&body).unwrap();
-        
+
         assert_eq!(analysis.drone_id, 1);
         assert!(!analysis.threat_level.is_empty());
         assert!(!analysis.estimated_type.is_empty());
@@ -315,7 +320,7 @@ mod tests {
     async fn test_analyze_handler_invalid_json() {
         let metrics = Arc::new(AppMetrics::new());
         let app = create_router(metrics);
-        
+
         let response = app
             .oneshot(
                 Request::builder()
@@ -336,7 +341,7 @@ mod tests {
     async fn test_analyze_handler_missing_body() {
         let metrics = Arc::new(AppMetrics::new());
         let app = create_router(metrics);
-        
+
         let response = app
             .oneshot(
                 Request::builder()
@@ -357,7 +362,7 @@ mod tests {
     async fn test_analyze_handler_different_targets() {
         let metrics = Arc::new(AppMetrics::new());
         let app = create_router(metrics);
-        
+
         let targets = vec![
             TargetPosition {
                 id: 1,
@@ -390,13 +395,12 @@ mod tests {
                 .unwrap();
 
             assert_eq!(response.status(), StatusCode::OK);
-            
+
             let body = response.into_body().collect().await.unwrap().to_bytes();
             let analysis: DroneAnalysis = serde_json::from_slice(&body).unwrap();
-            
+
             assert_eq!(analysis.drone_id, target.id);
             assert!(!analysis.threat_level.is_empty());
         }
     }
 }
-
