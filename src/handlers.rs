@@ -322,3 +322,182 @@ async fn handle_socket(socket: WebSocket) {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::body::Body;
+    use axum::http::{Request, StatusCode};
+    use crate::routes::create_router;
+    use http_body_util::BodyExt;
+    use tower::ServiceExt;
+
+    #[tokio::test]
+    async fn test_simulate_handler() {
+        let app = create_router();
+        
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/simulate")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let result: SimulationResult = serde_json::from_slice(&body).unwrap();
+        
+        assert!(!result.range_doppler_map.is_empty());
+        assert!(!result.range_profile.is_empty());
+        assert!(result.config.n_range_bins > 0);
+        assert!(result.config.n_doppler_bins > 0);
+    }
+
+    #[tokio::test]
+    async fn test_simulate_handler_with_query_params() {
+        let app = create_router();
+        
+        // Query params are currently ignored, but handler should still work
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/simulate?fc=5.0e9&prf=1000.0")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let result: SimulationResult = serde_json::from_slice(&body).unwrap();
+        
+        assert!(!result.range_doppler_map.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_analyze_handler_success() {
+        let app = create_router();
+        
+        let target = TargetPosition {
+            id: 1,
+            range_m: 10_000.0,
+            azimuth_deg: 45.0,
+            vel_m_s: 30.0,
+            rcs: 0.8,
+        };
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/analyze")
+                    .method("POST")
+                    .header("content-type", "application/json")
+                    .body(Body::from(serde_json::to_string(&target).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let analysis: DroneAnalysis = serde_json::from_slice(&body).unwrap();
+        
+        assert_eq!(analysis.drone_id, 1);
+        assert!(!analysis.threat_level.is_empty());
+        assert!(!analysis.estimated_type.is_empty());
+        assert!(analysis.confidence > 0.0 && analysis.confidence <= 1.0);
+        assert!(!analysis.recommendations.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_analyze_handler_invalid_json() {
+        let app = create_router();
+        
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/analyze")
+                    .method("POST")
+                    .header("content-type", "application/json")
+                    .body(Body::from("invalid json"))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        // Should return 400 Bad Request for invalid JSON
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn test_analyze_handler_missing_body() {
+        let app = create_router();
+        
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/analyze")
+                    .method("POST")
+                    .header("content-type", "application/json")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        // Should return 400 Bad Request for missing body
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn test_analyze_handler_different_targets() {
+        let app = create_router();
+        
+        let targets = vec![
+            TargetPosition {
+                id: 1,
+                range_m: 3_000.0,
+                azimuth_deg: 0.0,
+                vel_m_s: 50.0,
+                rcs: 0.9,
+            },
+            TargetPosition {
+                id: 2,
+                range_m: 20_000.0,
+                azimuth_deg: 180.0,
+                vel_m_s: 15.0,
+                rcs: 0.5,
+            },
+        ];
+
+        for target in targets {
+            let response = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .uri("/api/analyze")
+                        .method("POST")
+                        .header("content-type", "application/json")
+                        .body(Body::from(serde_json::to_string(&target).unwrap()))
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+
+            assert_eq!(response.status(), StatusCode::OK);
+            
+            let body = response.into_body().collect().await.unwrap().to_bytes();
+            let analysis: DroneAnalysis = serde_json::from_slice(&body).unwrap();
+            
+            assert_eq!(analysis.drone_id, target.id);
+            assert!(!analysis.threat_level.is_empty());
+        }
+    }
+}
+
