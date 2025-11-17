@@ -79,7 +79,7 @@ jobs:
     
     - name: Run tests
       working-directory: ./frontend
-      run: npm test -- --run
+      run: npm run test:ci
     
     - name: Build
       working-directory: ./frontend
