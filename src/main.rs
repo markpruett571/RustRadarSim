@@ -1,6 +1,8 @@
 use axum::http::HeaderValue;
 use axum::http::Method;
-use radar_sim::observability::{init_tracing, AppMetrics};
+use radar_sim::observability::{
+    init_tracing, AppMetrics, HealthChecks, HealthStatus, MetricsResponse,
+};
 use radar_sim::routes::create_router;
 use radar_sim::types::{
     AnalysisWebSocketMessage, DroneAnalysis, RiskAssessment, TargetPosition, TrajectoryAnalysis,
@@ -19,17 +21,25 @@ use utoipa_swagger_ui::SwaggerUi;
 
 #[derive(OpenApi)]
 #[openapi(
-    paths(radar_sim::handlers::analyze_handler),
+    paths(
+        radar_sim::handlers::analyze_handler,
+        radar_sim::observability::health_handler,
+        radar_sim::observability::metrics_handler
+    ),
     components(schemas(
         TargetPosition,
         DroneAnalysis,
         TrajectoryAnalysis,
         RiskAssessment,
         WebSocketMessage,
-        AnalysisWebSocketMessage
+        AnalysisWebSocketMessage,
+        HealthStatus,
+        HealthChecks,
+        MetricsResponse
     )),
     tags(
-        (name = "Analysis", description = "Drone analysis endpoints")
+        (name = "Analysis", description = "Drone analysis endpoints"),
+        (name = "Health & Metrics", description = "Health check and metrics endpoints")
     ),
     info(
         title = "Drone Radar Simulation API",

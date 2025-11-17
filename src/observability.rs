@@ -8,9 +8,10 @@ use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::RwLock;
 use tracing::info;
+use utoipa::ToSchema;
 
 /// Application health status
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct HealthStatus {
     pub status: String,
     pub version: String,
@@ -18,7 +19,7 @@ pub struct HealthStatus {
     pub checks: HealthChecks,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct HealthChecks {
     pub api: String,
     pub websocket: String,
@@ -87,6 +88,14 @@ impl Default for AppMetrics {
 }
 
 /// Health check endpoint handler
+#[utoipa::path(
+    get,
+    path = "/health",
+    responses(
+        (status = 200, description = "Health check successful", body = HealthStatus)
+    ),
+    tag = "Health & Metrics"
+)]
 pub async fn health_handler(State(metrics): State<Arc<AppMetrics>>) -> impl IntoResponse {
     let uptime = metrics.uptime_seconds();
 
@@ -109,7 +118,7 @@ pub async fn health_handler(State(metrics): State<Arc<AppMetrics>>) -> impl Into
 }
 
 /// Metrics endpoint handler
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct MetricsResponse {
     pub uptime_seconds: u64,
     pub total_requests: u64,
@@ -120,6 +129,15 @@ pub struct MetricsResponse {
     pub success_rate: f64,
 }
 
+/// Metrics endpoint handler
+#[utoipa::path(
+    get,
+    path = "/metrics",
+    responses(
+        (status = 200, description = "Application metrics", body = MetricsResponse)
+    ),
+    tag = "Health & Metrics"
+)]
 pub async fn metrics_handler(State(metrics): State<Arc<AppMetrics>>) -> impl IntoResponse {
     let uptime = metrics.uptime_seconds();
     let total = *metrics.total_requests.read().await;
