@@ -139,7 +139,7 @@ async fn handle_socket(socket: WebSocket, metrics: Arc<AppMetrics>) {
 
                                 // Update target positions
                                 for pos in &mut target_positions {
-                                    // Update range based on velocity (negative velocity = moving away)
+                                    // Update range based on velocity (positive velocity = moving away, negative = moving toward)
                                     pos.range_m += pos.vel_m_s * 0.1; // 0.1 seconds per update
 
                                     // Update azimuth (circular motion for demo)

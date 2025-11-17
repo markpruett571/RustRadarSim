@@ -241,9 +241,10 @@ function DroneGrid({ targets, maxRange = 50_000, selectedDroneId, onDroneSelect 
         ctx.arc(screenX, screenY, radius, 0, 2 * Math.PI)
         ctx.fill()
 
-        // Draw velocity vector
+        // Draw velocity vector (radial velocity: positive = away from radar, negative = toward radar)
         const velLength = Math.min(Math.abs(target.vel_m_s) * 2, 30)
-        const velRad = (target.azimuth_deg * Math.PI) / 180 + (target.vel_m_s > 0 ? Math.PI : 0)
+        // Positive velocity points along azimuth (away), negative points opposite (toward)
+        const velRad = (target.azimuth_deg * Math.PI) / 180 + (target.vel_m_s < 0 ? Math.PI : 0)
         ctx.strokeStyle = '#ffff00'
         ctx.lineWidth = 2
         ctx.beginPath()

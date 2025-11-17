@@ -94,7 +94,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("Server starting on http://127.0.0.1:3001");
     info!("Analysis API endpoint: http://127.0.0.1:3001/api/analyze");
     info!("Drone Tracking WebSocket endpoint: ws://127.0.0.1:3001/ws");
-    info!("Analysis WebSocket endpoint: ws://127.0.0.1:3001/ws/analyze");
     info!("Health check endpoint: http://127.0.0.1:3001/health");
     info!("Metrics endpoint: http://127.0.0.1:3001/metrics");
     info!("Swagger UI: http://127.0.0.1:3001/swagger-ui/");
