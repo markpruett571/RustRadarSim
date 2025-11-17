@@ -251,7 +251,6 @@ mod tests {
 
         // Should have multiple recommendations for high-risk scenario
         assert!(!analysis.recommendations.is_empty());
-        assert!(analysis.recommendations.len() >= 1);
     }
 
     #[test]
