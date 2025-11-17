@@ -2,7 +2,7 @@
 
 ## Overview
 
-This project is a production-grade radar simulation platform built with Rust (Tokio/Axum) backend and React frontend.
+This project is a radar simulation platform built with Rust (Tokio/Axum) backend and React frontend.
 
 ## System Architecture
 
@@ -33,7 +33,7 @@ This project is a production-grade radar simulation platform built with Rust (To
 
 5. **API Layer** (`src/handlers.rs`)
    - RESTful API endpoints with OpenAPI documentation
-   - WebSocket handlers for real-time data streaming
+   - WebSocket handler for real-time data streaming
    - Input validation and request metrics tracking
 
 ### Resilience Patterns
@@ -119,7 +119,6 @@ This project is a production-grade radar simulation platform built with Rust (To
 ### WebSocket Endpoints
 
 - `ws://127.0.0.1:3001/ws` - Real-time drone tracking
-- `ws://127.0.0.1:3001/ws/analyze` - Real-time analysis requests
 
 ## Observability
 
@@ -183,7 +182,7 @@ This project is a production-grade radar simulation platform built with Rust (To
 
 3. **Monitoring**
    - Health check endpoint for load balancer integration
-   - Metrics endpoint for Prometheus/Grafana integration
+   - Metrics endpoint for third-party monitoring integration
    - Structured logs for log aggregation systems
 
 ### Scalability
@@ -228,4 +227,3 @@ This project is a production-grade radar simulation platform built with Rust (To
 5. **Database Integration**
    - Historical data storage
    - Analytics and reporting
-

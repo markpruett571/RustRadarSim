@@ -1,6 +1,6 @@
 # Radar Simulation Platform
 
-A production-grade radar simulation platform with a Rust (Tokio/Axum) backend and React frontend. Features real-time drone tracking, threat analysis, comprehensive observability, and resilient system patterns.
+A radar simulation platform with a Rust (Tokio/Axum) backend and React frontend. Features real-time drone tracking, threat analysis, observability, and resilient system patterns.
 
 ## Project Structure
 
@@ -31,7 +31,6 @@ The server will start on `http://127.0.0.1:3001`
 - Swagger UI: `http://127.0.0.1:3001/swagger-ui/`
 - OpenAPI JSON: `http://127.0.0.1:3001/api-docs/openapi.json`
 - Drone Tracking WebSocket: `ws://127.0.0.1:3001/ws`
-- Analysis WebSocket: `ws://127.0.0.1:3001/ws/analyze`
 
 ### Frontend (React Application)
 
@@ -110,31 +109,19 @@ The API includes automatically generated OpenAPI documentation:
 
 ### WebSocket API
 
-- `ws://127.0.0.1:3001/ws/analyze` - WebSocket connection for drone analysis
+- `ws://127.0.0.1:3001/ws` - WebSocket connection for drone tracking
 
-**Analysis WebSocket (`/ws/analyze`) Messages:**
+**WebSocket (`/ws`) Messages:**
 
-Send analysis request:
+Send tracking request:
 ```json
 {
-  "type": "analyze",
-  "drone_id": 1,
-  "target": {
-    "id": 1,
-    "range_m": 5000.0,
-    "azimuth_deg": 45.0,
-    "vel_m_s": 30.0,
-    "rcs": 0.8
-  }
+  "type": "start_tracking"
 }
 ```
 
-Receive analysis results:
-- `{"type": "analysis_result", "analysis": {...}}` - Drone analysis with threat level, risk assessment, and recommendations
-- `{"type": "analysis_error", "message": "..."}` - Error message
-- `{"type": "analysis_status", "message": "..."}` - Status update
-
-The frontend uses HTTP REST API for drone analysis and can optionally use WebSocket for real-time analysis updates.
+Receive tracking results:
+- `{"type": "targets", "targets": {...}}` - Drone tracking data
 
 ## Technology Stack
 
@@ -277,4 +264,3 @@ npm run build
 - Efficient WebSocket connection management
 - CPU-intensive tasks on blocking thread pool
 - Optimized builds for production
-
