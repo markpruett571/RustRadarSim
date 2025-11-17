@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import './App.css'
 import DroneGrid from './components/DroneGrid'
 import DetectionControls from './components/SimulationControls'
+import HealthDashboard from './components/HealthDashboard'
 import { useWebSocket } from './hooks/useWebSocket'
 import { useAnalysis } from './hooks/useAnalysis'
 import { TargetPosition, DroneAnalysis, WebSocketMessage } from './types'
@@ -107,6 +108,8 @@ function App() {
       </header>
       
       <main>
+        <HealthDashboard />
+        
         <DetectionControls
           onStartDetection={handleStartDetection}
           tracking={tracking}

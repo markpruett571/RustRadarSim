@@ -1,6 +1,6 @@
-# Drone Radar Simulation Project
+# Radar Simulation Platform
 
-A drone radar simulation system with a Rust backend and React frontend for tracking and analyzing drones.
+A production-grade radar simulation platform with a Rust (Tokio/Axum) backend and React frontend. Features real-time drone tracking, threat analysis, comprehensive observability, and resilient system patterns.
 
 ## Project Structure
 
@@ -26,8 +26,11 @@ The server will start on `http://127.0.0.1:3001`
 
 **Available endpoints:**
 - Analysis API: `http://127.0.0.1:3001/api/analyze`
+- Health Check: `http://127.0.0.1:3001/health`
+- Metrics: `http://127.0.0.1:3001/metrics`
 - Swagger UI: `http://127.0.0.1:3001/swagger-ui/`
 - OpenAPI JSON: `http://127.0.0.1:3001/api-docs/openapi.json`
+- Drone Tracking WebSocket: `ws://127.0.0.1:3001/ws`
 - Analysis WebSocket: `ws://127.0.0.1:3001/ws/analyze`
 
 ### Frontend (React Application)
@@ -136,15 +139,33 @@ The frontend uses HTTP REST API for drone analysis and can optionally use WebSoc
 ## Technology Stack
 
 ### Backend
-- **Rust** with **Axum** 0.8 - High-performance async web framework
+- **Rust** with **Tokio** - High-performance async runtime
+- **Axum** 0.8 - Modern async web framework
+- **tracing** & **tracing-subscriber** - Structured logging and observability
 - **utoipa** 5.4 - Automatic OpenAPI documentation generation
 - **utoipa-swagger-ui** 9.0 - Interactive Swagger UI
-- **tokio** - Async runtime
+- **tower-http** - Middleware for timeouts, tracing, CORS
 - **serde** - Serialization framework for API data structures
+- **thiserror** & **anyhow** - Error handling
 
 ### Frontend
-- **React** with **TypeScript**
+- **React** 19 with **TypeScript**
 - **Vite** - Fast build tool and dev server
+- **Vitest** - Testing framework
+- **React Testing Library** - Component testing
+
+## Architecture
+
+This project follows production-grade architecture patterns:
+
+- **Async Backend Services**: Tokio-based async services for high concurrency
+- **Observability**: Structured logging, metrics, and health checks
+- **Resilience**: Retry logic, timeouts, graceful degradation
+- **Security**: Input validation, CORS configuration, request timeouts
+- **Modular Design**: Well-separated concerns, documented API contracts
+- **CI/CD**: Automated testing, linting, and building
+
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for detailed architecture documentation.
 
 ## Building for Production
 
@@ -166,4 +187,94 @@ The built frontend will be in `frontend/dist/`
 ## Development
 
 The project uses `rust-toolchain.toml` to ensure all developers use the same Rust version. The Rust toolchain will be automatically selected when you run `cargo` commands.
+
+### Environment Variables
+
+- `RUST_LOG` - Control log levels (default: `radar_sim=info,tower_http=info`)
+- `PRODUCTION` - Set to `true` to enable production mode (restricts CORS)
+- `ALLOWED_ORIGINS` - Comma-separated list of allowed CORS origins (production mode)
+
+### Testing
+
+#### Backend Tests
+```bash
+cargo test
+```
+
+#### Frontend Tests
+```bash
+cd frontend
+npm test
+```
+
+### CI/CD
+
+The project includes GitHub Actions workflows for:
+- Automated testing on push/PR
+- Code linting (clippy, eslint)
+- Format checking (rustfmt)
+- Build verification
+
+## Production Deployment
+
+### Backend
+
+1. Build release binary:
+```bash
+cargo build --release
+```
+
+2. Set environment variables:
+```bash
+export PRODUCTION=true
+export ALLOWED_ORIGINS=https://yourdomain.com
+export RUST_LOG=radar_sim=info
+```
+
+3. Run the server:
+```bash
+./target/release/radar_sim
+```
+
+### Frontend
+
+1. Build production assets:
+```bash
+cd frontend
+npm run build
+```
+
+2. Serve the `dist/` directory with a web server (nginx, Apache, etc.)
+
+### Monitoring
+
+- Health checks: Configure load balancer to check `/health` endpoint
+- Metrics: Integrate `/metrics` endpoint with Prometheus/Grafana
+- Logs: Configure log aggregation for structured JSON logs
+
+## Key Features
+
+### Observability
+- Structured JSON logging with configurable levels
+- Application metrics (requests, success rates, connections)
+- Health check endpoints for monitoring
+- Request/response tracing
+
+### Resilience
+- Automatic retry with exponential backoff
+- Request timeouts (30 seconds)
+- Graceful error handling
+- Offline detection and user feedback
+
+### Security
+- Input validation on all endpoints
+- Configurable CORS policies
+- Request timeout protection
+- Error message sanitization
+
+### Performance
+- Async/await for non-blocking I/O
+- Efficient WebSocket connection management
+- CPU-intensive tasks on blocking thread pool
+- Optimized builds for production
 

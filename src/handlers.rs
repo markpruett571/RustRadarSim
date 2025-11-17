@@ -1,17 +1,17 @@
 use crate::analysis::analyze_drone;
+use crate::observability::AppMetrics;
 use crate::types::{
     AnalysisWebSocketMessage, TargetPosition, DroneAnalysis, WebSocketMessage,
 };
 use axum::{
-    extract::{
-        ws::{Message, WebSocket, WebSocketUpgrade},
-    },
+    extract::{State, ws::{Message, WebSocket, WebSocketUpgrade}},
     response::Json,
     http::StatusCode,
 };
 use futures_util::{SinkExt, StreamExt};
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use tracing::{error, info, warn};
 
 #[utoipa::path(
     post,
@@ -24,8 +24,28 @@ use tokio::sync::Mutex;
     tag = "Analysis"
 )]
 pub async fn analyze_handler(
+    State(metrics): State<Arc<AppMetrics>>,
     axum::extract::Json(target): axum::extract::Json<TargetPosition>,
 ) -> Result<Json<DroneAnalysis>, StatusCode> {
+    metrics.increment_requests().await;
+    
+    // Validate input
+    if target.range_m < 0.0 || target.range_m > 100_000.0 {
+        metrics.increment_failure().await;
+        warn!("Invalid range: {}", target.range_m);
+        return Err(StatusCode::BAD_REQUEST);
+    }
+    
+    if target.azimuth_deg < 0.0 || target.azimuth_deg >= 360.0 {
+        metrics.increment_failure().await;
+        warn!("Invalid azimuth: {}", target.azimuth_deg);
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    let target_id = target.id;
+    let target_range = target.range_m;
+    info!("Analyzing target: id={}, range={}m", target_id, target_range);
+    
     // Run analysis on a separate thread (blocking task)
     // This ensures it doesn't block the async runtime
     let analysis_result = tokio::task::spawn_blocking(move || {
@@ -33,23 +53,37 @@ pub async fn analyze_handler(
     }).await;
 
     match analysis_result {
-        Ok(analysis) => Ok(Json(analysis)),
+        Ok(analysis) => {
+            metrics.increment_success().await;
+            metrics.increment_analysis().await;
+            info!("Analysis completed successfully for target id={}", target_id);
+            Ok(Json(analysis))
+        }
         Err(e) => {
-            eprintln!("Analysis task error: {}", e);
+            metrics.increment_failure().await;
+            error!("Analysis task error: {}", e);
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
 }
 
-pub async fn websocket_handler(ws: WebSocketUpgrade) -> axum::response::Response {
-    ws.on_upgrade(handle_socket)
+pub async fn websocket_handler(
+    State(metrics): State<Arc<AppMetrics>>,
+    ws: WebSocketUpgrade,
+) -> axum::response::Response {
+    ws.on_upgrade(move |socket| handle_socket(socket, metrics))
 }
 
-pub async fn analysis_websocket_handler(ws: WebSocketUpgrade) -> axum::response::Response {
-    ws.on_upgrade(handle_analysis_socket)
+pub async fn analysis_websocket_handler(
+    State(metrics): State<Arc<AppMetrics>>,
+    ws: WebSocketUpgrade,
+) -> axum::response::Response {
+    ws.on_upgrade(move |socket| handle_analysis_socket(socket, metrics))
 }
 
-async fn handle_socket(socket: WebSocket) {
+async fn handle_socket(socket: WebSocket, metrics: Arc<AppMetrics>) {
+    metrics.increment_websocket_connection().await;
+    info!("WebSocket connection established");
     let (sender, mut receiver) = socket.split();
     let sender_arc = Arc::new(Mutex::new(sender));
     let mut tracking_handle: Option<tokio::task::JoinHandle<()>> = None;
@@ -147,6 +181,8 @@ async fn handle_socket(socket: WebSocket) {
                 if let Some(handle) = tracking_handle.take() {
                     handle.abort();
                 }
+                metrics.decrement_websocket_connection().await;
+                info!("WebSocket connection closed");
                 break;
             }
             _ => {}
@@ -154,7 +190,9 @@ async fn handle_socket(socket: WebSocket) {
     }
 }
 
-async fn handle_analysis_socket(socket: WebSocket) {
+async fn handle_analysis_socket(socket: WebSocket, metrics: Arc<AppMetrics>) {
+    metrics.increment_websocket_connection().await;
+    info!("Analysis WebSocket connection established");
     let (sender, mut receiver) = socket.split();
     let sender_arc = Arc::new(Mutex::new(sender));
     
@@ -214,6 +252,8 @@ async fn handle_analysis_socket(socket: WebSocket) {
                 }
             }
             Message::Close(_) => {
+                metrics.decrement_websocket_connection().await;
+                info!("Analysis WebSocket connection closed");
                 break;
             }
             _ => {}
@@ -231,9 +271,13 @@ mod tests {
     use http_body_util::BodyExt;
     use tower::ServiceExt;
 
+    use crate::observability::AppMetrics;
+    use std::sync::Arc;
+
     #[tokio::test]
     async fn test_analyze_handler_success() {
-        let app = create_router();
+        let metrics = Arc::new(AppMetrics::new());
+        let app = create_router(metrics);
         
         let target = TargetPosition {
             id: 1,
@@ -269,7 +313,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_analyze_handler_invalid_json() {
-        let app = create_router();
+        let metrics = Arc::new(AppMetrics::new());
+        let app = create_router(metrics);
         
         let response = app
             .oneshot(
@@ -289,7 +334,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_analyze_handler_missing_body() {
-        let app = create_router();
+        let metrics = Arc::new(AppMetrics::new());
+        let app = create_router(metrics);
         
         let response = app
             .oneshot(
@@ -309,7 +355,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_analyze_handler_different_targets() {
-        let app = create_router();
+        let metrics = Arc::new(AppMetrics::new());
+        let app = create_router(metrics);
         
         let targets = vec![
             TargetPosition {
