@@ -1,6 +1,6 @@
-# Radar Simulation Project
+# Drone Radar Simulation Project
 
-A radar simulation system with a Rust backend and React frontend for visualizing range-Doppler maps and radar data.
+A drone radar simulation system with a Rust backend and React frontend for tracking and analyzing drones.
 
 ## Project Structure
 
@@ -25,10 +25,9 @@ cargo run
 The server will start on `http://127.0.0.1:3001`
 
 **Available endpoints:**
-- API: `http://127.0.0.1:3001/api/simulate`
+- Analysis API: `http://127.0.0.1:3001/api/analyze`
 - Swagger UI: `http://127.0.0.1:3001/swagger-ui/`
 - OpenAPI JSON: `http://127.0.0.1:3001/api-docs/openapi.json`
-- WebSocket: `ws://127.0.0.1:3001/ws`
 - Analysis WebSocket: `ws://127.0.0.1:3001/ws/analyze`
 
 ### Frontend (React Application)
@@ -52,19 +51,18 @@ The frontend will typically run on `http://localhost:5173` (Vite's default port)
 
 ## Features
 
-- **Radar Simulation**: Configurable radar parameters including:
-  - Carrier frequency (fc)
-  - Sampling rate (fs)
-  - Pulse repetition frequency (PRF)
-  - Number of pulses
-  - Pulse width
-  - Noise level
+- **Drone Tracking**: Real-time tracking of multiple drones with position, velocity, and radar cross-section (RCS) data
+- **Drone Analysis**: Comprehensive analysis of detected drones including:
+  - Threat level assessment (low, medium, high)
+  - Drone type estimation
+  - Trajectory analysis (heading, speed, altitude)
+  - Risk assessment (proximity risk, velocity risk, overall risk)
+  - Actionable recommendations
 
 - **Visualizations**:
-  - Range Profile: Line chart showing average magnitude per range bin
-  - Range-Doppler Map: Heatmap visualization of range vs Doppler frequency
+  - 2D Position Grid: Interactive visualization of drone positions on a radar grid
+  - Drone Information Panel: Detailed information about detected drones
 
-- **Interactive Controls**: Adjust simulation parameters and run new simulations in real-time
 - **OpenAPI Documentation**: Automatic API documentation generation with interactive Swagger UI
 
 ## API Documentation
@@ -83,60 +81,33 @@ The API includes automatically generated OpenAPI documentation:
 
 ### HTTP REST API
 
-- `GET /api/simulate` - Run radar simulation with optional query parameters:
-  - `fc` - Carrier frequency (Hz, default: 10 GHz)
-  - `fs` - Sampling rate (Hz, default: 1 MHz)
-  - `prf` - Pulse repetition frequency (Hz, default: 500 Hz)
-  - `num_pulses` - Number of pulses (default: 32)
-  - `pulse_width` - Pulse width in seconds (default: 50 μs)
-  - `noise_sigma` - Noise standard deviation (default: 0.1)
+- `POST /api/analyze` - Analyze a detected drone
 
-**Response:** Returns a `SimulationResult` containing:
-- `range_doppler_map`: 2D array of range-Doppler data
-- `range_profile`: Averaged magnitude per range bin
-- `config`: Simulation configuration used
+**Request Body:**
+```json
+{
+  "id": 1,
+  "range_m": 5000.0,
+  "azimuth_deg": 45.0,
+  "vel_m_s": 30.0,
+  "rcs": 0.8
+}
+```
 
-Example: `http://127.0.0.1:3001/api/simulate?fc=10000000000&fs=1000000&prf=500`
+**Response:** Returns a `DroneAnalysis` containing:
+- `drone_id`: Identifier of the analyzed drone
+- `threat_level`: Threat assessment (low, medium, high)
+- `estimated_type`: Estimated drone type
+- `confidence`: Confidence score (0.0 to 1.0)
+- `trajectory_analysis`: Heading, speed, and altitude estimates
+- `risk_assessment`: Proximity, velocity, and overall risk scores
+- `recommendations`: List of actionable recommendations
 
 > 💡 **Tip**: Use the [Swagger UI](http://127.0.0.1:3001/swagger-ui/) to explore and test the API interactively!
 
 ### WebSocket API
 
-- `ws://127.0.0.1:3001/ws` - WebSocket connection for real-time radar simulation
 - `ws://127.0.0.1:3001/ws/analyze` - WebSocket connection for drone analysis
-
-**Message Format:**
-
-Send simulation request:
-```json
-{
-  "type": "simulate",
-  "params": {
-    "fc": 10000000000,
-    "fs": 1000000,
-    "prf": 500,
-    "num_pulses": 32,
-    "pulse_width": 0.00005,
-    "noise_sigma": 0.1
-  }
-}
-```
-
-**Simulation WebSocket (`/ws`) Messages:**
-
-Receive responses:
-- `{"type": "result", ...}` - Simulation result with range_doppler_map, range_profile, and config
-- `{"type": "error", "message": "..."}` - Error message
-- `{"type": "status", "message": "..."}` - Status update (e.g., "Running simulation...")
-- `{"type": "targets", "targets": [...]}` - Real-time target position updates (when tracking is active)
-
-Start tracking:
-```json
-{
-  "type": "start_tracking",
-  "params": { ... }
-}
-```
 
 **Analysis WebSocket (`/ws/analyze`) Messages:**
 
@@ -160,7 +131,7 @@ Receive analysis results:
 - `{"type": "analysis_error", "message": "..."}` - Error message
 - `{"type": "analysis_status", "message": "..."}` - Status update
 
-The frontend automatically uses WebSocket when available and falls back to HTTP if the WebSocket connection fails.
+The frontend uses HTTP REST API for drone analysis and can optionally use WebSocket for real-time analysis updates.
 
 ## Technology Stack
 
@@ -169,7 +140,7 @@ The frontend automatically uses WebSocket when available and falls back to HTTP 
 - **utoipa** 5.4 - Automatic OpenAPI documentation generation
 - **utoipa-swagger-ui** 9.0 - Interactive Swagger UI
 - **tokio** - Async runtime
-- **ndarray** - Numerical computing for radar signal processing
+- **serde** - Serialization framework for API data structures
 
 ### Frontend
 - **React** with **TypeScript**

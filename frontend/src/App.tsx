@@ -1,15 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import './App.css'
-import CircularRadar from './components/CircularRadar'
 import DroneGrid from './components/DroneGrid'
 import DetectionControls from './components/SimulationControls'
 import { useWebSocket } from './hooks/useWebSocket'
 import { useAnalysis } from './hooks/useAnalysis'
-import { SimulationResult, WebSocketMessage, TargetPosition, DroneAnalysis } from './types'
+import { TargetPosition, DroneAnalysis, WebSocketMessage } from './types'
 
 function App() {
-  const [data, setData] = useState<SimulationResult | null>(null)
-  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [status, setStatus] = useState<string | null>(null)
   const [targets, setTargets] = useState<TargetPosition[]>([])
@@ -29,29 +26,19 @@ function App() {
         const message = JSON.parse(event.data) as WebSocketMessage
         
         switch (message.type) {
-          case 'result':
-            setData({
-              range_doppler_map: message.range_doppler_map,
-              range_profile: message.range_profile,
-              config: message.config,
-            })
-            setLoading(false)
-            setStatus(null)
-            break
-          case 'error':
-            setError(message.message)
-            setLoading(false)
-            setStatus(null)
-            break
-          case 'status':
-            setStatus(message.message)
-            break
           case 'targets':
             setTargets(message.targets)
             // Clear selection if selected drone is no longer in the list
             if (selectedDroneId !== null && !message.targets.some(t => t.id === selectedDroneId)) {
               setSelectedDroneId(null)
             }
+            break
+          case 'error':
+            setError(message.message)
+            setStatus(null)
+            break
+          case 'status':
+            setStatus(message.message)
             break
           default:
             console.log('Unknown message type:', (message as { type: string }).type)
@@ -61,7 +48,7 @@ function App() {
         setError('Failed to parse server message')
       }
     }
-  }, [socket])
+  }, [socket, selectedDroneId])
 
   const handleStartDetection = useCallback(() => {
     if (!connected || !send) {
@@ -72,10 +59,9 @@ function App() {
     setTracking(true)
     setTargets([])
     setError(null)
-    // Start tracking with default parameters (backend will use fixed values)
+    // Start tracking
     const message: WebSocketMessage = {
-      type: 'start_tracking',
-      params: {}
+      type: 'start_tracking'
     }
     send(message)
   }, [connected, send])
@@ -108,8 +94,6 @@ function App() {
     }
   }, [analyze, selectedDroneId, targets])
 
-  const displayError = error || wsError || analysisError
-
   return (
     <div className="app">
       <header>
@@ -118,7 +102,7 @@ function App() {
           <span className={`status-indicator ${connected ? 'connected' : 'disconnected'}`}>
             {connected ? '●' : '○'}
           </span>
-          <span>{connected ? 'WebSocket Connected' : 'WebSocket Disconnected (using HTTP fallback)'}</span>
+          <span>{connected ? 'WebSocket Connected' : 'WebSocket Disconnected'}</span>
         </div>
       </header>
       
@@ -143,30 +127,15 @@ function App() {
             </div>
           )}
     
-        {data && !loading && (
-          <div className="visualizations">
-            <div className="chart-container">
-              <h2>Radar Display</h2>
-              <CircularRadar data={data.range_doppler_map} config={data.config} targets={targets} />
-            </div>
-          </div>
-        )}
-
-        {displayError && (
+        {(error || wsError || analysisError) && (
           <div className="error">
-            <p>Error: {displayError}</p>
+            <p>Error: {error || wsError || analysisError}</p>
           </div>
         )}
 
         {status && (
           <div className="status">
             <p>{status}</p>
-          </div>
-        )}
-
-        {loading && !status && (
-          <div className="loading">
-            <p>Running simulation...</p>
           </div>
         )}
 
