@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom'
-import { expect, afterEach, vi } from 'vitest'
+import { afterEach, vi } from 'vitest'
 import { cleanup } from '@testing-library/react'
 
 // Polyfill for URL and URLSearchParams in Node.js test environment

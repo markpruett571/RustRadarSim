@@ -30,23 +30,6 @@ pub enum WebSocketMessage {
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
-#[serde(tag = "type")]
-#[schema(as = utoipa::openapi::Object)]
-pub enum AnalysisWebSocketMessage {
-    #[serde(rename = "analyze")]
-    Analyze {
-        drone_id: usize,
-        target: TargetPosition,
-    },
-    #[serde(rename = "analysis_result")]
-    AnalysisResult { analysis: DroneAnalysis },
-    #[serde(rename = "analysis_error")]
-    AnalysisError { message: String },
-    #[serde(rename = "analysis_status")]
-    AnalysisStatus { message: String },
-}
-
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct DroneAnalysis {
     /// Drone identifier
     pub drone_id: usize,

@@ -1,6 +1,6 @@
 use crate::analysis::analyze_drone;
 use crate::observability::AppMetrics;
-use crate::types::{AnalysisWebSocketMessage, DroneAnalysis, TargetPosition, WebSocketMessage};
+use crate::types::{DroneAnalysis, TargetPosition, WebSocketMessage};
 use axum::{
     extract::{
         ws::{Message, WebSocket, WebSocketUpgrade},
@@ -77,13 +77,6 @@ pub async fn websocket_handler(
     ws: WebSocketUpgrade,
 ) -> axum::response::Response {
     ws.on_upgrade(move |socket| handle_socket(socket, metrics))
-}
-
-pub async fn analysis_websocket_handler(
-    State(metrics): State<Arc<AppMetrics>>,
-    ws: WebSocketUpgrade,
-) -> axum::response::Response {
-    ws.on_upgrade(move |socket| handle_analysis_socket(socket, metrics))
 }
 
 async fn handle_socket(socket: WebSocket, metrics: Arc<AppMetrics>) {
@@ -189,77 +182,6 @@ async fn handle_socket(socket: WebSocket, metrics: Arc<AppMetrics>) {
                 }
                 metrics.decrement_websocket_connection().await;
                 info!("WebSocket connection closed");
-                break;
-            }
-            _ => {}
-        }
-    }
-}
-
-async fn handle_analysis_socket(socket: WebSocket, metrics: Arc<AppMetrics>) {
-    metrics.increment_websocket_connection().await;
-    info!("Analysis WebSocket connection established");
-    let (sender, mut receiver) = socket.split();
-    let sender_arc = Arc::new(Mutex::new(sender));
-
-    // Handle incoming messages
-    while let Some(Ok(msg)) = receiver.next().await {
-        match msg {
-            Message::Text(text) => {
-                match serde_json::from_str::<AnalysisWebSocketMessage>(&text) {
-                    Ok(AnalysisWebSocketMessage::Analyze { drone_id, target }) => {
-                        // Send status update
-                        let status = AnalysisWebSocketMessage::AnalysisStatus {
-                            message: format!("Analyzing drone #{}...", drone_id),
-                        };
-                        if let Ok(json) = serde_json::to_string(&status) {
-                            let mut s = sender_arc.lock().await;
-                            let _ = s.send(Message::Text(json.into())).await;
-                        }
-
-                        // Run analysis on a separate thread (blocking task)
-                        // This ensures it doesn't block the async runtime
-                        let sender_clone = sender_arc.clone();
-                        let analysis_result =
-                            tokio::task::spawn_blocking(move || analyze_drone(&target)).await;
-
-                        match analysis_result {
-                            Ok(analysis) => {
-                                let response =
-                                    AnalysisWebSocketMessage::AnalysisResult { analysis };
-                                if let Ok(json) = serde_json::to_string(&response) {
-                                    let mut s = sender_clone.lock().await;
-                                    let _ = s.send(Message::Text(json.into())).await;
-                                }
-                            }
-                            Err(e) => {
-                                let error_msg = AnalysisWebSocketMessage::AnalysisError {
-                                    message: format!("Analysis task error: {}", e),
-                                };
-                                if let Ok(json) = serde_json::to_string(&error_msg) {
-                                    let mut s = sender_clone.lock().await;
-                                    let _ = s.send(Message::Text(json.into())).await;
-                                }
-                            }
-                        }
-                    }
-                    Ok(_) => {
-                        // Other message types
-                    }
-                    Err(e) => {
-                        let error_msg = AnalysisWebSocketMessage::AnalysisError {
-                            message: format!("Invalid message format: {}", e),
-                        };
-                        if let Ok(json) = serde_json::to_string(&error_msg) {
-                            let mut s = sender_arc.lock().await;
-                            let _ = s.send(Message::Text(json.into())).await;
-                        }
-                    }
-                }
-            }
-            Message::Close(_) => {
-                metrics.decrement_websocket_connection().await;
-                info!("Analysis WebSocket connection closed");
                 break;
             }
             _ => {}

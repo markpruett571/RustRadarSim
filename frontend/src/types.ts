@@ -31,10 +31,3 @@ export type WebSocketMessage =
   | { type: 'targets'; targets: TargetPosition[] }
   | { type: 'error'; message: string }
   | { type: 'status'; message: string }
-
-export type AnalysisWebSocketMessage =
-  | { type: 'analyze'; drone_id: number; target: TargetPosition }
-  | { type: 'analysis_result'; analysis: DroneAnalysis }
-  | { type: 'analysis_error'; message: string }
-  | { type: 'analysis_status'; message: string }
-

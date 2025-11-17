@@ -5,8 +5,7 @@ use radar_sim::observability::{
 };
 use radar_sim::routes::create_router;
 use radar_sim::types::{
-    AnalysisWebSocketMessage, DroneAnalysis, RiskAssessment, TargetPosition, TrajectoryAnalysis,
-    WebSocketMessage,
+    DroneAnalysis, RiskAssessment, TargetPosition, TrajectoryAnalysis, WebSocketMessage,
 };
 use std::sync::Arc;
 use tower::ServiceBuilder;
@@ -32,7 +31,6 @@ use utoipa_swagger_ui::SwaggerUi;
         TrajectoryAnalysis,
         RiskAssessment,
         WebSocketMessage,
-        AnalysisWebSocketMessage,
         HealthStatus,
         HealthChecks,
         MetricsResponse
